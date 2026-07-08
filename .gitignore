@@ -1,0 +1,10 @@
+node_modules/
+dist/
+*.tsbuildinfo
+*.log
+
+qa-*.png
+
+# Source duplicate; the app uses public/hero.mp4.
+/hero.mp4
+/hero_new.mp4
