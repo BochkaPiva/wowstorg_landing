@@ -2,9 +2,15 @@
 
 ## Current Phase
 
-The project is a React 18 + TypeScript + Vite landing page with a premium interactive hero.
+The project is a React 18 + TypeScript + Vite landing page with a premium interactive hero
+and a separate public catalog shell at `/catalog`.
 The current repository stays frontend-only until the product structure, content model, and
 lead workflow are approved.
+
+The first development-only admin surface now exists at `/admin`. It uses a local draft
+repository and cannot be enabled in production until server authentication, persistence and
+auditing are added. The approved application boundary is documented in
+`docs/ADMIN_ARCHITECTURE.md`.
 
 ## Direction
 
@@ -28,6 +34,46 @@ src/shared              Reusable UI, libs, styles, config
 src/integrations        External system boundaries
 docs                    Product, architecture, data, and integration notes
 ```
+
+## Content Architecture
+
+The landing is structured as a conversion narrative:
+
+1. attention through the mascot-driven hero;
+2. interest through positioning and event formats;
+3. selection through a catalog of props, games, packages, and services;
+4. trust through scenarios, cases, and production process;
+5. conversion through a focused request flow.
+
+The future admin panel should edit content blocks and catalog items, not arbitrary page HTML.
+
+## Catalog Integration Boundary
+
+The public catalog and `WebApp_WowStorg` are related products with different ownership:
+
+- `WebApp_WowStorg` owns physical inventory, quantities, reservations, and availability;
+- the public catalog owns package presentation, marketing content, media, SEO, and publication;
+- packages reference B2B inventory through stable external IDs;
+- the public browser reads a server-produced public projection, never the internal database;
+- date-specific availability and lead submission go through authenticated server-to-server
+  integration endpoints;
+- internal prices, service notes, partner-only data, and operational statuses are excluded
+  from the public contract by default.
+
+This boundary allows the future catalog and admin panel to evolve without coupling the
+landing bundle to the B2B schema or exposing privileged data.
+
+## Current Catalog Shell
+
+- `/catalog` is selected from `window.location.pathname` without adding a routing dependency;
+- category state is reflected in the `section` query parameter;
+- the catalog intentionally contains no fabricated positions;
+- the cart is persisted under a versioned `localStorage` key and is available on both pages;
+- selected cart lines are appended to the current lead email body;
+- production hosting must rewrite `/catalog` to `index.html` while the project remains a Vite SPA.
+
+When catalog detail routes and server-rendered SEO pages become first-class, routing should
+move to the chosen SSR framework rather than expanding this temporary pathname switch.
 
 ## Non-Goals For The Current Phase
 

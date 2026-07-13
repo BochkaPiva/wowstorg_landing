@@ -7,17 +7,18 @@ export function Statement() {
         <Reveal>
           <h2 className="section-title text-balance">
             ВАУСТОРГ превращает корпоративные задачи в{" "}
-            <span className="purple">игровые события</span>.
+            <span className="accent">игровые события</span>.
           </h2>
         </Reveal>
+
         <Reveal delay={0.12} className="statement__copy">
           <p>
-            Мы собираем механику, реквизит, ведущих и визуальную подачу в единый сценарий:
+            Собираем механику, реквизит, ведущих и визуальную подачу в один сценарий:
             от камерного тимбилдинга до большой бренд-зоны на городском событии.
           </p>
-          <div className="statement__signal">
+          <div className="statement__signal" aria-label="Ключевые принципы">
             <span>Игра</span>
-            <span>Технология</span>
+            <span>Темп</span>
             <span>Вау-эффект</span>
           </div>
         </Reveal>

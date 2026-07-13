@@ -5,12 +5,12 @@ const formats = [
   {
     icon: Trophy,
     title: "Тимбилдинги",
-    text: "Командные игры с понятной целью, динамикой и финальным вау-моментом.",
+    text: "Командные игры с ясной целью, динамикой и финальным вау-моментом.",
   },
   {
     icon: Sparkles,
     title: "Корпоративные интерактивы",
-    text: "Игровые станции, активности и соревновательные зоны для мероприятий любого масштаба.",
+    text: "Игровые станции, активности и соревновательные зоны для событий любого масштаба.",
   },
   {
     icon: Wrench,
@@ -36,14 +36,15 @@ export function Formats() {
             </p>
           </div>
         </Reveal>
+
         <div className="format-grid">
           {formats.map((format, index) => {
             const Icon = format.icon;
             return (
               <Reveal key={format.title} delay={index * 0.05}>
-                <article className="pixel-card format-card">
+                <article className="format-card">
                   <div className="format-card__icon">
-                    <Icon size={24} aria-hidden="true" />
+                    <Icon size={23} aria-hidden="true" />
                   </div>
                   <h3>{format.title}</h3>
                   <p>{format.text}</p>

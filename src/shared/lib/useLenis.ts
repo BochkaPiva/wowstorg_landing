@@ -17,6 +17,17 @@ export function useLenis() {
       touchMultiplier: 1.1,
     });
 
+    const handleScrollLock = (event: Event) => {
+      const isLocked = (event as CustomEvent<boolean>).detail;
+      if (isLocked) {
+        lenis.stop();
+      } else {
+        lenis.start();
+      }
+    };
+
+    window.addEventListener("wowstorg:scroll-lock", handleScrollLock);
+
     let frame = 0;
     const raf = (time: number) => {
       lenis.raf(time);
@@ -27,6 +38,7 @@ export function useLenis() {
 
     return () => {
       cancelAnimationFrame(frame);
+      window.removeEventListener("wowstorg:scroll-lock", handleScrollLock);
       lenis.destroy();
     };
   }, []);

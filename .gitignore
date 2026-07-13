@@ -2,9 +2,21 @@ node_modules/
 dist/
 *.tsbuildinfo
 *.log
+.env
+.env.*
+!.env.example
+supabase/.temp/
+supabase/signing_keys.json
+
+# Project-local agent tooling must never enter the product repository.
+.agents/
+.codex/
+.mcp.json
 
 qa-*.png
 
 # Source duplicate; the app uses public/hero.mp4.
 /hero.mp4
 /hero_new.mp4
+/enhanced_hero_new.mp4
+/dino/

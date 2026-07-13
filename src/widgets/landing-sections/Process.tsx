@@ -2,35 +2,50 @@ import { ClipboardList, Cuboid, Flag, Users } from "lucide-react";
 import { Reveal } from "@shared/ui/Reveal";
 
 const steps = [
-  ["Разбираем задачу", "Формат, площадка, аудитория, длительность, ограничения и желаемый эффект.", ClipboardList],
-  ["Собираем механику", "Подбираем игры, сценарий, роли персонала и логику перемещения гостей.", Cuboid],
-  ["Готовим площадку", "Привозим реквизит, собираем зоны, проверяем безопасность и тайминг.", Flag],
-  ["Проводим событие", "Ведущие и игротехники управляют процессом, а гости просто включаются в игру.", Users],
+  {
+    icon: ClipboardList,
+    title: "Разбираем задачу",
+    text: "Формат, площадка, аудитория, длительность, ограничения и желаемый эффект.",
+  },
+  {
+    icon: Cuboid,
+    title: "Собираем механику",
+    text: "Подбираем игры, сценарий, роли персонала и логику перемещения гостей.",
+  },
+  {
+    icon: Flag,
+    title: "Готовим площадку",
+    text: "Привозим реквизит, собираем зоны, проверяем безопасность и тайминг.",
+  },
+  {
+    icon: Users,
+    title: "Ведем событие",
+    text: "Команда держит темп, а гости включаются в игру без лишних инструкций.",
+  },
 ];
 
 export function Process() {
   return (
-    <section className="section process">
-      <div className="section-inner">
-        <Reveal>
-          <div className="split-head">
-            <h2 className="section-title">Как проходит работа</h2>
-            <p className="section-copy">
-              Держим процесс понятным: от первой задачи до последнего раунда на площадке.
-            </p>
-          </div>
+    <section className="section production" id="process">
+      <div className="section-inner production__inner">
+        <Reveal className="production__title">
+          <h2 className="section-title">Премиальный эффект держится на точной подготовке</h2>
         </Reveal>
-        <div className="process-grid">
-          {steps.map(([title, text, Icon], index) => (
-            <Reveal key={title as string} delay={index * 0.06}>
-              <article className="process-step">
-                <span>{String(index + 1).padStart(2, "0")}</span>
-                <Icon size={25} aria-hidden="true" />
-                <h3>{title as string}</h3>
-                <p>{text as string}</p>
-              </article>
-            </Reveal>
-          ))}
+
+        <div className="production-map">
+          {steps.map((step, index) => {
+            const Icon = step.icon;
+            return (
+              <Reveal key={step.title} delay={index * 0.06}>
+                <article className="production-step">
+                  <Icon size={22} aria-hidden="true" />
+                  <span>{String(index + 1).padStart(2, "0")}</span>
+                  <h3>{step.title}</h3>
+                  <p>{step.text}</p>
+                </article>
+              </Reveal>
+            );
+          })}
         </div>
       </div>
     </section>

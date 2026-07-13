@@ -1,26 +1,56 @@
+import { useEffect } from "react";
 import { useLenis } from "@shared/lib/useLenis";
 import { Hero } from "@widgets/hero/Hero";
-import { FinalCta } from "@widgets/landing-sections/FinalCta";
+import { DinoStory } from "@widgets/dino-story/DinoStory";
+import { LeadForm } from "@widgets/lead-form/LeadForm";
+import { Faq } from "@widgets/landing-sections/Faq";
 import { Footer } from "@widgets/landing-sections/Footer";
-import { Formats } from "@widgets/landing-sections/Formats";
-import { Games } from "@widgets/landing-sections/Games";
-import { Process } from "@widgets/landing-sections/Process";
-import { Statement } from "@widgets/landing-sections/Statement";
-import { UseCases } from "@widgets/landing-sections/UseCases";
+import { FormatIndex } from "@widgets/landing-sections/FormatIndex";
+import { TrustMarquee } from "@widgets/landing-sections/TrustMarquee";
+import { CasesShowcase } from "@widgets/landing-sections/CasesShowcase";
+import { CookieConsent } from "@widgets/legal/CookieConsent";
+import { CatalogGateway } from "@widgets/catalog-gateway/CatalogGateway";
+import { CatalogPage } from "@widgets/catalog-page/CatalogPage";
+import { CatalogCartProvider } from "@features/catalog-cart/CatalogCartContext";
+import { AdminPage } from "@widgets/admin-page/AdminPage";
+import { loadPreviewContent } from "@features/admin-content/localDraftRepository";
 
-export default function App() {
+function LandingPage() {
   useLenis();
+
+  useEffect(() => {
+    const seo = loadPreviewContent().seo;
+    document.title = seo.title;
+    const description = document.querySelector<HTMLMetaElement>('meta[name="description"]');
+    if (description) description.content = seo.description;
+  }, []);
 
   return (
     <main className="page-shell">
       <Hero />
-      <Statement />
-      <Formats />
-      <Games />
-      <UseCases />
-      <Process />
-      <FinalCta />
+      <TrustMarquee />
+      <FormatIndex />
+      <CatalogGateway />
+      <CasesShowcase />
+      <DinoStory />
+      <Faq />
+      <LeadForm />
       <Footer />
     </main>
+  );
+}
+
+export default function App() {
+  const pathname = window.location.pathname.replace(/\/$/, "");
+  const isCatalogPage = pathname === "/catalog";
+  const isAdminPage = pathname === "/admin";
+
+  if (isAdminPage) return <AdminPage />;
+
+  return (
+    <CatalogCartProvider>
+      {isCatalogPage ? <CatalogPage /> : <LandingPage />}
+      <CookieConsent />
+    </CatalogCartProvider>
   );
 }

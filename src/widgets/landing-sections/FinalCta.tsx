@@ -1,26 +1,28 @@
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { Reveal } from "@shared/ui/Reveal";
+import { siteConfig } from "@shared/config/site";
 
 export function FinalCta() {
   return (
     <section className="section final-cta" id="contacts">
-      <div className="section-inner">
+      <div className="section-inner final-cta__grid">
         <Reveal>
-          <div className="final-cta__box">
-            <Sparkles size={30} aria-hidden="true" />
-            <h2>Хотите, чтобы гости не просто пришли, а включились?</h2>
+          <div>
+            <span className="chapter-kicker">Заявка</span>
+            <h2>Опишите событие, а мы соберем игровую механику под него</h2>
+          </div>
+        </Reveal>
+
+        <Reveal delay={0.1}>
+          <div className="request-panel">
             <p>
-              Опишите задачу — предложим формат, который подойдёт под вашу площадку, бюджет и
-              аудиторию.
+              Напишите, где проходит событие, сколько гостей ожидается и какой эффект нужен:
+              вовлечь команду, собрать поток, усилить бренд-зону или добавить вау-момент.
             </p>
-            <div className="hero__actions">
-              <a className="button-primary" href="mailto:hello@wowstorg.ru">
-                Обсудить проект <ArrowRight size={18} aria-hidden="true" />
-              </a>
-              <a className="button-secondary" href="#games">
-                Получить подборку игр
-              </a>
-            </div>
+            <a className="button-primary" href={`mailto:${siteConfig.contactEmail}`}>
+              Обсудить проект <ArrowRight size={18} aria-hidden="true" />
+            </a>
+            <small>Омск. Корпоративы, тимбилдинги, интерактивные зоны и аренда реквизита.</small>
           </div>
         </Reveal>
       </div>

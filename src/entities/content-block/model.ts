@@ -1,10 +1,16 @@
 export type ContentBlockKind =
   | "hero"
   | "statement"
+  | "proof"
   | "formats"
+  | "services"
+  | "catalog_preview"
   | "games"
   | "use_cases"
+  | "case_studies"
+  | "wow_mechanic"
   | "process"
+  | "faq"
   | "final_cta"
   | "footer";
 
