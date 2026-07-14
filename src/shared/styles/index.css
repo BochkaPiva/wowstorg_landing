@@ -2893,6 +2893,8 @@ a:focus-visible {
 .legal-modal__surface {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
+  height: calc(100dvh - 32px);
+  min-height: 0;
   max-height: calc(100dvh - 32px);
   overflow: hidden;
   background: #090909;
@@ -2939,10 +2941,14 @@ a:focus-visible {
 }
 
 .legal-modal__scroll {
-  overflow: auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
   overscroll-behavior: contain;
+  touch-action: pan-y;
   scrollbar-width: thin;
   scrollbar-color: #4a4a46 #090909;
+  -webkit-overflow-scrolling: touch;
 }
 
 .legal-modal__scroll::-webkit-scrollbar {
@@ -3029,6 +3035,7 @@ a:focus-visible {
   }
 
   .legal-modal__surface {
+    height: 100dvh;
     min-height: 100dvh;
     max-height: 100dvh;
     border: 0;

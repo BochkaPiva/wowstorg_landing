@@ -39,16 +39,22 @@ export function LegalModalProvider({ children }: { children: ReactNode }) {
     const dialog = dialogRef.current;
     if (!dialog) return;
 
+    const setPageScrollLocked = (isLocked: boolean) => {
+      document.documentElement.classList.toggle("has-open-dialog", isLocked);
+      window.dispatchEvent(new CustomEvent("wowstorg:scroll-lock", { detail: isLocked }));
+    };
+
     if (activeKey) {
       if (!dialog.open) dialog.showModal();
-      const previousOverflow = document.body.style.overflow;
-      document.body.style.overflow = "hidden";
-      return () => {
-        document.body.style.overflow = previousOverflow;
-      };
+      setPageScrollLocked(true);
+    } else {
+      if (dialog.open) dialog.close();
+      setPageScrollLocked(false);
     }
 
-    if (dialog.open) dialog.close();
+    return () => {
+      if (activeKey) setPageScrollLocked(false);
+    };
   }, [activeKey]);
 
   const handleBackdropClick = (event: MouseEvent<HTMLDialogElement>) => {
@@ -78,7 +84,7 @@ export function LegalModalProvider({ children }: { children: ReactNode }) {
                 <X size={22} aria-hidden="true" />
               </button>
             </header>
-            <div className="legal-modal__scroll">
+            <div className="legal-modal__scroll" data-lenis-prevent tabIndex={0}>
               <div className="legal-modal__intro">
                 <h2 id={titleId}>{legalDocument.title}</h2>
                 <p>{legalDocument.introduction}</p>
