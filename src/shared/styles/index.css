@@ -2907,32 +2907,6 @@ a:focus-visible {
   100% { box-shadow: 0 0 0 12px rgb(255 207 35 / 0); }
 }
 
-.brief-form__summary {
-  display: grid;
-  grid-template-columns: 110px minmax(0, 1fr);
-  gap: 18px;
-  align-items: baseline;
-  margin: -12px 0 34px;
-  border-bottom: 1px solid rgb(11 11 11 / 0.18);
-  padding-bottom: 18px;
-}
-
-.brief-form__summary span {
-  color: rgb(11 11 11 / 0.46);
-  font-size: 0.7rem;
-  font-weight: 750;
-  text-transform: uppercase;
-}
-
-.brief-form__summary p {
-  margin: 0;
-  color: #111;
-  font-size: clamp(0.9rem, 1.25vw, 1.05rem);
-  font-weight: 650;
-  line-height: 1.45;
-  text-wrap: pretty;
-}
-
 .brief-choiceGroup label,
 .brief-date__mode button,
 .brief-period__months button,
@@ -3306,12 +3280,6 @@ a:focus-visible {
 }
 
 @media (max-width: 560px) {
-  .brief-form__summary {
-    grid-template-columns: 1fr;
-    gap: 6px;
-    margin-bottom: 28px;
-  }
-
   .brief-date__mode {
     grid-template-columns: 1fr;
     border-radius: 8px;

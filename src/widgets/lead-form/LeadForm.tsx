@@ -168,13 +168,6 @@ export function LeadForm() {
     }
     return "дата уточняется";
   }, [form.dateMode, form.exactDate, form.periodMonth, form.periodPart]);
-  const summaryItems = useMemo(() => [
-    form.eventType,
-    form.guestRange ? `${form.guestRange} гостей` : "",
-    dateSummary,
-    step === 2 ? (form.contactType === "MAX" ? "MAX" : form.contactType.toLocaleLowerCase("ru-RU")) : "",
-  ].filter(Boolean), [dateSummary, form.eventType, form.guestRange, form.contactType, step]);
-
   const update = <Key extends keyof LeadFormState>(key: Key, value: LeadFormState[Key]) => {
     setForm((current) => ({ ...current, [key]: value }));
   };
@@ -287,11 +280,6 @@ export function LeadForm() {
           <div className="brief-form__progress" aria-label={`Шаг ${step} из 2`}>
             <span className={step >= 1 ? "is-active" : ""}>01 Событие</span>
             <span className={step >= 2 ? "is-active" : ""}>02 Контакт</span>
-          </div>
-
-          <div className="brief-form__summary" aria-live="polite">
-            <span>Ваш запрос</span>
-            <p>{summaryItems.length ? summaryItems.join(" · ") : "Соберём его вместе за несколько нажатий"}</p>
           </div>
 
           {step === 1 ? (
