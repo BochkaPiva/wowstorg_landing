@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Check, ShoppingBag } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarDays, Check, ChevronLeft, ChevronRight, ShoppingBag } from "lucide-react";
 import { type FormEvent, useCallback, useMemo, useState } from "react";
 import { useCatalogCart } from "@features/catalog-cart/CatalogCartContext";
 import { useSiteContent } from "@features/site-content/SiteContentContext";
@@ -8,10 +8,10 @@ import { LegalLink } from "@widgets/legal/LegalModal";
 type LeadFormState = {
   eventType: string;
   guestRange: string;
-  dateMode: "known" | "flexible";
-  dateDay: string;
-  dateMonth: string;
-  dateYear: string;
+  dateMode: "exact" | "period" | "unknown";
+  exactDate: string;
+  periodMonth: string;
+  periodPart: "any" | "start" | "middle" | "end";
   name: string;
   company: string;
   contactType: string;
@@ -23,10 +23,10 @@ type LeadFormState = {
 const initialState: LeadFormState = {
   eventType: "",
   guestRange: "",
-  dateMode: "flexible",
-  dateDay: "",
-  dateMonth: "",
-  dateYear: String(new Date().getFullYear()),
+  dateMode: "unknown",
+  exactDate: "",
+  periodMonth: "",
+  periodPart: "any",
   name: "",
   company: "",
   contactType: "Телефон",
@@ -36,6 +36,46 @@ const initialState: LeadFormState = {
 };
 
 const consentVersion = "2026-07-13-v1";
+
+const monthNames = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
+const weekDays = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+const periodPartLabels = {
+  any: "Весь месяц",
+  start: "Начало",
+  middle: "Середина",
+  end: "Конец",
+} as const;
+
+function toIsoDate(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function parseIsoDate(value: string) {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function formatExactDate(value: string) {
+  if (!value) return "Выберите день";
+  return new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", year: "numeric" }).format(parseIsoDate(value));
+}
+
+function formatPeriodMonth(value: string) {
+  if (!value) return "Выберите месяц";
+  const [year, month] = value.split("-").map(Number);
+  return `${monthNames[month - 1]} ${year}`;
+}
+
+function getCalendarDays(cursor: Date) {
+  const year = cursor.getFullYear();
+  const month = cursor.getMonth();
+  const firstDayOffset = (new Date(year, month, 1).getDay() + 6) % 7;
+  const totalDays = new Date(year, month + 1, 0).getDate();
+  return Array.from({ length: 42 }, (_, index) => {
+    const day = index - firstDayOffset + 1;
+    return day > 0 && day <= totalDays ? new Date(year, month, day) : null;
+  });
+}
 
 function formatRussianPhone(value: string) {
   const digits = value.replace(/\D/g, "");
@@ -84,6 +124,10 @@ export function LeadForm() {
   const contactTypes = previewContent.leadForm.contactTypes;
   const [step, setStep] = useState<1 | 2>(1);
   const [form, setForm] = useState<LeadFormState>(initialState);
+  const [calendarCursor, setCalendarCursor] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
   const [submissionStatus, setSubmissionStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [submissionMessage, setSubmissionMessage] = useState("");
   const [turnstileToken, setTurnstileToken] = useState("");
@@ -94,13 +138,42 @@ export function LeadForm() {
   const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? "";
   const isPhoneContact = form.contactType === "Телефон";
 
-  const dateComplete = form.dateMode === "flexible" || Boolean(form.dateDay && form.dateMonth && form.dateYear.length === 4);
+  const today = useMemo(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  }, []);
+  const calendarDays = useMemo(() => getCalendarDays(calendarCursor), [calendarCursor]);
+  const periodMonths = useMemo(() => Array.from({ length: 12 }, (_, index) => {
+    const date = new Date(today.getFullYear(), today.getMonth() + index, 1);
+    return { value: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`, label: monthNames[date.getMonth()], year: date.getFullYear() };
+  }), [today]);
+  const dateComplete = form.dateMode === "unknown" || (form.dateMode === "exact" ? Boolean(form.exactDate) : Boolean(form.periodMonth));
   const firstStepComplete = Boolean(form.eventType && form.guestRange && dateComplete);
   const contactPlaceholder = useMemo(() => {
     if (form.contactType === "Email") return "name@company.ru";
     if (form.contactType === "MAX") return "Телефон или ссылка на профиль";
     return "+7 900 000-00-00";
   }, [form.contactType]);
+  const contactHint = useMemo(() => {
+    if (form.contactType === "Email") return "Пришлём предложение и уточняющие вопросы на почту.";
+    if (form.contactType === "MAX") return "Напишем в MAX по номеру или ссылке на профиль.";
+    return "Позвоним или напишем — как будет удобнее.";
+  }, [form.contactType]);
+  const dateSummary = useMemo(() => {
+    if (form.dateMode === "exact") return formatExactDate(form.exactDate);
+    if (form.dateMode === "period") {
+      if (!form.periodMonth) return "примерный период";
+      const part = form.periodPart === "any" ? "" : ` · ${periodPartLabels[form.periodPart].toLocaleLowerCase("ru-RU")}`;
+      return `${formatPeriodMonth(form.periodMonth)}${part}`;
+    }
+    return "дата уточняется";
+  }, [form.dateMode, form.exactDate, form.periodMonth, form.periodPart]);
+  const summaryItems = useMemo(() => [
+    form.eventType,
+    form.guestRange ? `${form.guestRange} гостей` : "",
+    dateSummary,
+    step === 2 ? (form.contactType === "MAX" ? "MAX" : form.contactType.toLocaleLowerCase("ru-RU")) : "",
+  ].filter(Boolean), [dateSummary, form.eventType, form.guestRange, form.contactType, step]);
 
   const update = <Key extends keyof LeadFormState>(key: Key, value: LeadFormState[Key]) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -131,9 +204,11 @@ export function LeadForm() {
     setSubmissionStatus("submitting");
     setSubmissionMessage("");
 
-    const eventDate = form.dateMode === "known"
-      ? `${form.dateYear}-${form.dateMonth.padStart(2, "0")}-${form.dateDay.padStart(2, "0")}`
-      : null;
+    const eventDate = form.dateMode === "exact" ? form.exactDate : null;
+    const dateNote = form.dateMode === "period" && form.periodMonth
+      ? `Ориентир по дате: ${dateSummary}.`
+      : "";
+    const message = [dateNote, form.message.trim()].filter(Boolean).join("\n");
 
     try {
       const response = await fetch(`${supabaseUrl}/functions/v1/submit-lead`, {
@@ -145,13 +220,13 @@ export function LeadForm() {
         body: JSON.stringify({
           eventType: form.eventType,
           guestRange: form.guestRange,
-          dateMode: form.dateMode,
+          dateMode: form.dateMode === "exact" ? "known" : "flexible",
           eventDate,
           name: form.name,
           company: form.company,
           contactType: form.contactType,
           contact: form.contact,
-          message: form.message,
+          message,
           catalogSelectionIds: cartItems.flatMap((item) => Array.from({ length: item.quantity }, () => item.id)),
           consentVersion,
           turnstileToken,
@@ -214,6 +289,11 @@ export function LeadForm() {
             <span className={step >= 2 ? "is-active" : ""}>02 Контакт</span>
           </div>
 
+          <div className="brief-form__summary" aria-live="polite">
+            <span>Ваш запрос</span>
+            <p>{summaryItems.length ? summaryItems.join(" · ") : "Соберём его вместе за несколько нажатий"}</p>
+          </div>
+
           {step === 1 ? (
             <div className="brief-form__step">
               <fieldset>
@@ -221,27 +301,73 @@ export function LeadForm() {
                 <ChoiceGroup name="eventType" options={eventTypes} value={form.eventType} onChange={(value) => update("eventType", value)} />
               </fieldset>
 
-              <div className="brief-form__split">
-                <fieldset>
-                  <legend>Сколько будет гостей?</legend>
-                  <ChoiceGroup name="guestRange" options={guestRanges} value={form.guestRange} onChange={(value) => update("guestRange", value)} />
-                </fieldset>
+              <fieldset>
+                <legend>Сколько будет гостей?</legend>
+                <ChoiceGroup name="guestRange" options={guestRanges} value={form.guestRange} onChange={(value) => update("guestRange", value)} />
+              </fieldset>
 
-                <fieldset className="brief-date">
-                  <legend>Когда?</legend>
-                  <div className="brief-date__mode" role="group" aria-label="Определена ли дата">
-                    <button type="button" className={form.dateMode === "known" ? "is-selected" : ""} onClick={() => update("dateMode", "known")}>Дата известна</button>
-                    <button type="button" className={form.dateMode === "flexible" ? "is-selected" : ""} onClick={() => update("dateMode", "flexible")}>Пока уточняется</button>
-                  </div>
-                  {form.dateMode === "known" ? (
-                    <div className="brief-date__fields">
-                      <label><span>День</span><input inputMode="numeric" maxLength={2} value={form.dateDay} placeholder="ДД" onChange={(event) => update("dateDay", event.target.value.replace(/\D/g, "").slice(0, 2))} /></label>
-                      <label><span>Месяц</span><input inputMode="numeric" maxLength={2} value={form.dateMonth} placeholder="ММ" onChange={(event) => update("dateMonth", event.target.value.replace(/\D/g, "").slice(0, 2))} /></label>
-                      <label><span>Год</span><input inputMode="numeric" maxLength={4} value={form.dateYear} placeholder="ГГГГ" onChange={(event) => update("dateYear", event.target.value.replace(/\D/g, "").slice(0, 4))} /></label>
+              <fieldset className="brief-date">
+                <legend>Когда планируете?</legend>
+                <div className="brief-date__mode" role="group" aria-label="Насколько определена дата">
+                  <button type="button" className={form.dateMode === "exact" ? "is-selected" : ""} onClick={() => update("dateMode", "exact")}><CalendarDays size={16} />Точная дата</button>
+                  <button type="button" className={form.dateMode === "period" ? "is-selected" : ""} onClick={() => update("dateMode", "period")}>Примерный период</button>
+                  <button type="button" className={form.dateMode === "unknown" ? "is-selected" : ""} onClick={() => update("dateMode", "unknown")}>Пока не знаю</button>
+                </div>
+
+                {form.dateMode === "exact" ? (
+                  <div className="brief-date__panel brief-date__panel--calendar">
+                    <div className="brief-date__selection">
+                      <span>Дата события</span>
+                      <strong>{formatExactDate(form.exactDate)}</strong>
+                      <p>Можно изменить позже — сейчас нужен ориентир для подготовки.</p>
                     </div>
-                  ) : null}
-                </fieldset>
-              </div>
+                    <div className="brief-calendar">
+                      <div className="brief-calendar__head">
+                        <button type="button" aria-label="Предыдущий месяц" disabled={calendarCursor <= new Date(today.getFullYear(), today.getMonth(), 1)} onClick={() => setCalendarCursor((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))}><ChevronLeft size={18} /></button>
+                        <strong>{monthNames[calendarCursor.getMonth()]} {calendarCursor.getFullYear()}</strong>
+                        <button type="button" aria-label="Следующий месяц" onClick={() => setCalendarCursor((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))}><ChevronRight size={18} /></button>
+                      </div>
+                      <div className="brief-calendar__week" aria-hidden="true">{weekDays.map((day) => <span key={day}>{day}</span>)}</div>
+                      <div className="brief-calendar__days">
+                        {calendarDays.map((date, index) => date ? (
+                          <button
+                            type="button"
+                            key={toIsoDate(date)}
+                            disabled={date < today}
+                            className={form.exactDate === toIsoDate(date) ? "is-selected" : ""}
+                            aria-label={new Intl.DateTimeFormat("ru-RU", { dateStyle: "long" }).format(date)}
+                            onClick={() => update("exactDate", toIsoDate(date))}
+                          >{date.getDate()}</button>
+                        ) : <span key={`empty-${index}`} />)}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
+                {form.dateMode === "period" ? (
+                  <div className="brief-date__panel brief-date__panel--period">
+                    <div className="brief-period__head">
+                      <span>Выберите ближайший ориентир</span>
+                      <strong>{form.periodMonth ? dateSummary : "Даже примерного месяца достаточно"}</strong>
+                    </div>
+                    <div className="brief-period__months" role="group" aria-label="Примерный месяц события">
+                      {periodMonths.map((month, index) => (
+                        <button type="button" key={month.value} className={form.periodMonth === month.value ? "is-selected" : ""} onClick={() => update("periodMonth", month.value)}>
+                          <span>{month.label}</span>{index === 0 || month.year !== periodMonths[index - 1]?.year ? <small>{month.year}</small> : null}
+                        </button>
+                      ))}
+                    </div>
+                    {form.periodMonth ? (
+                      <div className="brief-period__parts" role="group" aria-label="Часть месяца">
+                        <span>Насколько точно?</span>
+                        <div>{(Object.keys(periodPartLabels) as Array<keyof typeof periodPartLabels>).map((part) => <button type="button" key={part} className={form.periodPart === part ? "is-selected" : ""} onClick={() => update("periodPart", part)}>{periodPartLabels[part]}</button>)}</div>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {form.dateMode === "unknown" ? <p className="brief-date__unknown">Это нормально. Вернёмся к календарю после короткого разговора.</p> : null}
+              </fieldset>
 
               <button className="brief-form__next" type="button" disabled={!firstStepComplete} onClick={() => setStep(2)}>
                 Оставить контакт <ArrowRight size={18} aria-hidden="true" />
@@ -265,25 +391,28 @@ export function LeadForm() {
                     if (value === "Телефон") update("contact", formatRussianPhone(form.contact));
                   }}
                 />
-                <input
-                  className="brief-contactInput"
-                  type={form.contactType === "Email" ? "email" : "text"}
-                  inputMode={isPhoneContact ? "tel" : undefined}
-                  autoComplete={isPhoneContact ? "tel" : form.contactType === "Email" ? "email" : "off"}
-                  value={form.contact}
-                  required
-                  maxLength={isPhoneContact ? 18 : undefined}
-                  pattern={isPhoneContact ? "\\+7 \\(\\d{3}\\) \\d{3}-\\d{2}-\\d{2}" : undefined}
-                  title={isPhoneContact ? "Введите номер полностью: +7 (900) 000-00-00" : undefined}
-                  placeholder={contactPlaceholder}
-                  aria-label={`Контакт: ${form.contactType}`}
-                  onChange={(event) => update("contact", isPhoneContact ? formatRussianPhone(event.target.value) : event.target.value)}
-                />
+                <div className="brief-contactField" key={form.contactType}>
+                  <input
+                    className="brief-contactInput"
+                    type={form.contactType === "Email" ? "email" : "text"}
+                    inputMode={isPhoneContact ? "tel" : undefined}
+                    autoComplete={isPhoneContact ? "tel" : form.contactType === "Email" ? "email" : "off"}
+                    value={form.contact}
+                    required
+                    maxLength={isPhoneContact ? 18 : undefined}
+                    pattern={isPhoneContact ? "\\+7 \\(\\d{3}\\) \\d{3}-\\d{2}-\\d{2}" : undefined}
+                    title={isPhoneContact ? "Введите номер полностью: +7 (900) 000-00-00" : undefined}
+                    placeholder={contactPlaceholder}
+                    aria-label={`Контакт: ${form.contactType}`}
+                    onChange={(event) => update("contact", isPhoneContact ? formatRussianPhone(event.target.value) : event.target.value)}
+                  />
+                  <span className="brief-contactHint">{contactHint}</span>
+                </div>
               </fieldset>
 
               <label className="brief-message"><span>Что ещё важно учесть?</span><textarea value={form.message} rows={2} placeholder="Площадка, задача или ориентир по бюджету — необязательно" onChange={(event) => update("message", event.target.value)} /></label>
 
-              <label className="brief-check brief-check--consent">
+              <label className={`brief-check brief-check--consent${form.consent ? " is-checked" : ""}`}>
                 <input type="checkbox" checked={form.consent} required onChange={(event) => update("consent", event.target.checked)} />
                 <span className="brief-check__box"><Check size={14} /></span>
                 <span>Даю <LegalLink document="personalData">согласие на обработку персональных данных</LegalLink> и принимаю <LegalLink document="privacy">политику конфиденциальности</LegalLink>.</span>
