@@ -265,13 +265,34 @@ a:focus-visible {
   pointer-events: none;
 }
 
+.hero__poster,
 .hero__video {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  object-position: center bottom;
+  object-fit: contain;
+  object-position: center center;
+}
+
+.hero__poster {
+  z-index: 1;
+  opacity: 1;
+  transition: opacity 360ms var(--ease-out);
+}
+
+.hero__video {
+  z-index: 2;
+  opacity: 0;
+  transition: opacity 360ms var(--ease-out);
+}
+
+.hero__poster--hidden {
+  opacity: 0;
+}
+
+.hero__video--ready {
+  opacity: 1;
 }
 
 .hero__content {
@@ -1121,8 +1142,14 @@ a:focus-visible {
     inset: 44px 0 0;
   }
 
+  .hero__poster,
   .hero__video {
-    object-position: 52% bottom;
+    inset: clamp(18px, 5svh, 64px) auto auto 50%;
+    width: clamp(640px, 170vw, 1180px);
+    height: auto;
+    max-width: none;
+    object-position: center;
+    transform: translateX(-50%);
   }
 
   .hero__content {
@@ -1311,6 +1338,18 @@ a:focus-visible {
 
   .brief-form__submit {
     flex: 1;
+  }
+}
+
+@media (max-width: 960px) and (orientation: landscape) and (max-height: 650px) {
+  .hero__poster,
+  .hero__video {
+    top: 0;
+    width: min(125vw, 980px);
+  }
+
+  .hero__content {
+    bottom: 20px;
   }
 }
 

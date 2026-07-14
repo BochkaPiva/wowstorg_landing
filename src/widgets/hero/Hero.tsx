@@ -10,6 +10,7 @@ function clamp(value: number, min: number, max: number) {
 
 export function Hero() {
   const { content: previewContent } = useSiteContent();
+  const videoSrc = previewContent.hero.videoPath || siteConfig.heroVideoPath;
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const targetTime = useRef(0);
   const smoothTime = useRef(0);
@@ -25,6 +26,8 @@ export function Hero() {
     const video = videoRef.current;
     if (!video) return undefined;
 
+    setVideoReady(false);
+
     const setInitialTime = () => {
       if (!Number.isFinite(video.duration) || video.duration <= 0) return;
       durationRef.current = video.duration;
@@ -33,16 +36,21 @@ export function Hero() {
       smoothTime.current = middle;
       video.currentTime = middle;
     };
-    const markReady = () => setVideoReady(true);
+    const markReady = () => {
+      if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+        setVideoReady(true);
+      }
+    };
 
     video.addEventListener("loadedmetadata", setInitialTime);
-    video.addEventListener("loadeddata", markReady);
+    video.addEventListener("seeked", markReady);
     video.pause();
+    if (video.readyState >= HTMLMediaElement.HAVE_METADATA) setInitialTime();
     return () => {
       video.removeEventListener("loadedmetadata", setInitialTime);
-      video.removeEventListener("loadeddata", markReady);
+      video.removeEventListener("seeked", markReady);
     };
-  }, []);
+  }, [videoSrc]);
 
   useEffect(() => {
     const updateTargetFromX = (clientX: number) => {
@@ -128,14 +136,26 @@ export function Hero() {
       </div>
 
       <div className="hero__glow" aria-hidden="true" />
-      <motion.div
-        className="hero__videoWrap"
-        initial={prefersReducedMotion ? false : { opacity: 0 }}
-        animate={{ opacity: videoReady ? 1 : 0.22 }}
-        transition={{ duration: 1.15, ease: [0.16, 1, 0.3, 1] }}
-      >
-        <video ref={videoRef} className="hero__video" src={previewContent.hero.videoPath || siteConfig.heroVideoPath} preload="auto" muted playsInline disablePictureInPicture />
-      </motion.div>
+      <div className="hero__videoWrap" aria-hidden="true">
+        <img
+          className={`hero__poster ${videoReady ? "hero__poster--hidden" : ""}`}
+          src="/hero-poster.webp"
+          width="1280"
+          height="720"
+          alt=""
+          fetchPriority="high"
+          decoding="async"
+        />
+        <video
+          ref={videoRef}
+          className={`hero__video ${videoReady ? "hero__video--ready" : ""}`}
+          src={videoSrc}
+          preload="auto"
+          muted
+          playsInline
+          disablePictureInPicture
+        />
+      </div>
 
       <motion.div
         className="hero__content"
