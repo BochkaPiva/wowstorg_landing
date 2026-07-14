@@ -503,8 +503,10 @@ a:focus-visible {
 }
 
 .format-row p {
-  max-width: 440px;
+  width: min(100%, 760px);
+  max-width: none;
   color: rgb(11 11 11 / 0.68);
+  text-wrap: pretty;
 }
 
 .format-row span {
@@ -1492,7 +1494,7 @@ a:focus-visible {
 
 .format-row {
   min-height: 118px;
-  grid-template-columns: 48px minmax(230px, 0.76fr) minmax(320px, 1.35fr);
+  grid-template-columns: 48px minmax(270px, 0.7fr) minmax(420px, 1.5fr);
   padding: 20px 10px;
 }
 
