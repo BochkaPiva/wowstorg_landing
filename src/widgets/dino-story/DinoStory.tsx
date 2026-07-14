@@ -14,20 +14,6 @@ import { useSiteContent } from "@features/site-content/SiteContentContext";
 const SCENE_COUNT = 5;
 const CLIP_DURATION = 5.09;
 
-function useConstrainedMediaDevice() {
-  const [isConstrained, setIsConstrained] = useState(false);
-
-  useEffect(() => {
-    const query = window.matchMedia("(pointer: coarse), (max-width: 960px)");
-    const update = () => setIsConstrained(query.matches);
-    update();
-    query.addEventListener("change", update);
-    return () => query.removeEventListener("change", update);
-  }, []);
-
-  return isConstrained;
-}
-
 type StoryScene = {
   title: string;
   text: string;
@@ -242,7 +228,6 @@ export function DinoStory() {
   const [activeScene, setActiveScene] = useState(0);
   const [mediaRequested, setMediaRequested] = useState(false);
   const [storyPlaybackActive, setStoryPlaybackActive] = useState(true);
-  const constrainedMedia = useConstrainedMediaDevice();
   const reducedMotion = useReducedMotion();
   const { scrollYProgress } = useScroll({
     target: sectionRef,
@@ -323,8 +308,7 @@ export function DinoStory() {
               key={scene.title}
               index={index}
               progress={storyProgress}
-              shouldLoad={mediaRequested
-                && (constrainedMedia || (index >= activeScene - 1 && index <= activeScene + 2))}
+              shouldLoad={mediaRequested}
               canSeek={storyPlaybackActive}
             />
           ))}

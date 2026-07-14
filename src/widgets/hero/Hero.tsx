@@ -12,29 +12,66 @@ export function Hero() {
   const { content: previewContent } = useSiteContent();
   const videoSrc = previewContent.hero.videoPath || siteConfig.heroVideoPath;
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const targetRatio = useRef(0.5);
   const targetTime = useRef(0);
   const smoothTime = useRef(0);
   const durationRef = useRef(0);
-  const isSeeking = useRef(false);
-  const pendingTime = useRef<number | null>(null);
   const frameRef = useRef(0);
+  const [resolvedVideoSrc, setResolvedVideoSrc] = useState<string | null>(null);
   const [videoReady, setVideoReady] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const prefersReducedMotion = useReducedMotion();
 
   useEffect(() => {
+    const controller = new AbortController();
+    let objectUrl: string | null = null;
+    let active = true;
+
+    durationRef.current = 0;
+    setVideoReady(false);
+    setResolvedVideoSrc(null);
+
+    const bufferVideo = async () => {
+      try {
+        const response = await fetch(videoSrc, {
+          cache: "force-cache",
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error(`Hero video request failed: ${response.status}`);
+
+        const blob = await response.blob();
+        if (!active) return;
+        objectUrl = URL.createObjectURL(blob);
+        setResolvedVideoSrc(objectUrl);
+      } catch (error) {
+        if (!active || controller.signal.aborted) return;
+        // External CMS media can reject fetch because of CORS. Native video is a safe fallback.
+        setResolvedVideoSrc(videoSrc);
+      }
+    };
+
+    void bufferVideo();
+
+    return () => {
+      active = false;
+      controller.abort();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [videoSrc]);
+
+  useEffect(() => {
     const video = videoRef.current;
-    if (!video) return undefined;
+    if (!video || !resolvedVideoSrc) return undefined;
 
     setVideoReady(false);
 
     const setInitialTime = () => {
       if (!Number.isFinite(video.duration) || video.duration <= 0) return;
       durationRef.current = video.duration;
-      const middle = video.duration * 0.5;
-      targetTime.current = middle;
-      smoothTime.current = middle;
-      video.currentTime = middle;
+      const initialTime = video.duration * targetRatio.current;
+      targetTime.current = initialTime;
+      smoothTime.current = initialTime;
+      video.currentTime = initialTime;
     };
     const markReady = () => {
       if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
@@ -50,12 +87,14 @@ export function Hero() {
       video.removeEventListener("loadedmetadata", setInitialTime);
       video.removeEventListener("seeked", markReady);
     };
-  }, [videoSrc]);
+  }, [resolvedVideoSrc]);
 
   useEffect(() => {
     const updateTargetFromX = (clientX: number) => {
-      if (!durationRef.current) return;
-      targetTime.current = clamp(clientX / window.innerWidth, 0, 1) * durationRef.current;
+      targetRatio.current = clamp(clientX / window.innerWidth, 0, 1);
+      if (durationRef.current) {
+        targetTime.current = targetRatio.current * durationRef.current;
+      }
     };
     const onPointerMove = (event: PointerEvent) => updateTargetFromX(event.clientX);
     const onTouchMove = (event: TouchEvent) => {
@@ -74,36 +113,31 @@ export function Hero() {
     const video = videoRef.current;
     if (!video) return undefined;
 
-    const seekTo = (time: number) => {
-      if (!durationRef.current) return;
-      const nextTime = clamp(time, 0, durationRef.current);
-      if (Math.abs(video.currentTime - nextTime) < 0.015) return;
-      if (isSeeking.current) {
-        pendingTime.current = nextTime;
-        return;
+    let lastSeekAt = 0;
+    const seekInterval = 1000 / 30;
+
+    const raf = (now: number) => {
+      smoothTime.current += (targetTime.current - smoothTime.current) * 0.16;
+
+      if (
+        durationRef.current
+        && video.readyState >= HTMLMediaElement.HAVE_METADATA
+        && !video.seeking
+        && now - lastSeekAt >= seekInterval
+      ) {
+        const nextTime = clamp(smoothTime.current, 0, durationRef.current - 0.02);
+        if (Math.abs(video.currentTime - nextTime) >= 0.025) {
+          lastSeekAt = now;
+          video.currentTime = nextTime;
+        }
       }
-      isSeeking.current = true;
-      video.currentTime = nextTime;
-    };
-    const onSeeked = () => {
-      isSeeking.current = false;
-      if (pendingTime.current !== null) {
-        const next = pendingTime.current;
-        pendingTime.current = null;
-        seekTo(next);
-      }
-    };
-    const raf = () => {
-      smoothTime.current += (targetTime.current - smoothTime.current) * 0.1;
-      seekTo(smoothTime.current);
+
       frameRef.current = requestAnimationFrame(raf);
     };
 
-    video.addEventListener("seeked", onSeeked);
     frameRef.current = requestAnimationFrame(raf);
     return () => {
       cancelAnimationFrame(frameRef.current);
-      video.removeEventListener("seeked", onSeeked);
     };
   }, []);
 
@@ -149,7 +183,7 @@ export function Hero() {
         <video
           ref={videoRef}
           className={`hero__video ${videoReady ? "hero__video--ready" : ""}`}
-          src={videoSrc}
+          src={resolvedVideoSrc ?? undefined}
           preload="auto"
           muted
           playsInline
