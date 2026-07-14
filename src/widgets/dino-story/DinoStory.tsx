@@ -14,6 +14,20 @@ import { useSiteContent } from "@features/site-content/SiteContentContext";
 const SCENE_COUNT = 5;
 const CLIP_DURATION = 5.09;
 
+function useConstrainedMediaDevice() {
+  const [isConstrained, setIsConstrained] = useState(false);
+
+  useEffect(() => {
+    const query = window.matchMedia("(pointer: coarse), (max-width: 960px)");
+    const update = () => setIsConstrained(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+
+  return isConstrained;
+}
+
 type StoryScene = {
   title: string;
   text: string;
@@ -42,16 +56,26 @@ function StoryVideo({
   index,
   progress,
   shouldLoad,
+  canSeek,
 }: {
   index: number;
   progress: MotionValue<number>;
   shouldLoad: boolean;
+  canSeek: boolean;
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const isSeekingRef = useRef(false);
-  const pendingTimeRef = useRef<number | null>(null);
+  const targetTimeRef = useRef(0);
   const [frameReady, setFrameReady] = useState(false);
   const opacity = useSceneOpacity(progress, index);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    setFrameReady(false);
+    targetTimeRef.current = 0;
+    if (!video) return;
+    video.pause();
+    video.load();
+  }, [shouldLoad]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -59,76 +83,91 @@ function StoryVideo({
       return undefined;
     }
 
-    const seekTo = (time: number) => {
-      if (Math.abs(video.currentTime - time) <= 0.035) {
-        return;
-      }
+    let animationFrame = 0;
+    let frameCallback = 0;
+    let lastSeekAt = 0;
+    const seekInterval = 1000 / 24;
 
-      if (isSeekingRef.current || video.seeking) {
-        pendingTimeRef.current = time;
-        return;
-      }
-
-      isSeekingRef.current = true;
-      video.currentTime = time;
-    };
-
-    const onSeeked = () => {
-      isSeekingRef.current = false;
-      setFrameReady(true);
-      const pendingTime = pendingTimeRef.current;
-      pendingTimeRef.current = null;
-
-      if (pendingTime !== null) {
-        seekTo(pendingTime);
+    const revealFrame = () => {
+      if (typeof video.requestVideoFrameCallback === "function") {
+        if (frameCallback) video.cancelVideoFrameCallback(frameCallback);
+        frameCallback = video.requestVideoFrameCallback(() => setFrameReady(true));
+      } else {
+        setFrameReady(true);
       }
     };
 
-    const onLoadedData = () => setFrameReady(true);
-    const onLoadedMetadata = () => {
+    const updateTargetFromProgress = () => {
       const value = progress.get();
       const start = index / SCENE_COUNT;
       const end = (index + 1) / SCENE_COUNT;
       const localProgress = Math.min(1, Math.max(0, (value - start) / (end - start)));
       const duration = Number.isFinite(video.duration) ? video.duration : CLIP_DURATION;
-      seekTo(Math.min(duration - 0.04, localProgress * (duration - 0.04)));
+      targetTimeRef.current = Math.min(duration - 0.04, localProgress * (duration - 0.04));
     };
+
+    const seekLatestFrame = (now: number) => {
+      if (
+        canSeek
+        && shouldLoad
+        && video.readyState >= HTMLMediaElement.HAVE_METADATA
+        && !video.seeking
+        && now - lastSeekAt >= seekInterval
+      ) {
+        const duration = Number.isFinite(video.duration) ? video.duration : CLIP_DURATION;
+        const targetTime = Math.min(duration - 0.04, targetTimeRef.current);
+
+        if (Math.abs(video.currentTime - targetTime) > 0.04) {
+          lastSeekAt = now;
+          video.currentTime = targetTime;
+        }
+      }
+
+      if (canSeek && shouldLoad) {
+        animationFrame = requestAnimationFrame(seekLatestFrame);
+      }
+    };
+
+    const onLoadedMetadata = () => updateTargetFromProgress();
+    const onLoadedData = () => revealFrame();
+    const onSeeked = () => revealFrame();
 
     video.addEventListener("loadeddata", onLoadedData);
     video.addEventListener("loadedmetadata", onLoadedMetadata);
     video.addEventListener("seeked", onSeeked);
+    updateTargetFromProgress();
+    if (canSeek && shouldLoad) {
+      animationFrame = requestAnimationFrame(seekLatestFrame);
+    }
+
     return () => {
+      cancelAnimationFrame(animationFrame);
+      if (frameCallback && typeof video.cancelVideoFrameCallback === "function") {
+        video.cancelVideoFrameCallback(frameCallback);
+      }
       video.removeEventListener("loadeddata", onLoadedData);
       video.removeEventListener("loadedmetadata", onLoadedMetadata);
       video.removeEventListener("seeked", onSeeked);
     };
-  }, [index, progress, shouldLoad]);
+  }, [canSeek, index, progress, shouldLoad]);
 
   useMotionValueEvent(progress, "change", (value) => {
     const video = videoRef.current;
     const start = index / SCENE_COUNT;
     const end = (index + 1) / SCENE_COUNT;
 
-    if (!video || value < start - 0.04 || value > end + 0.04) {
+    if (!video || !shouldLoad || !canSeek || value < start - 0.04 || value > end + 0.04) {
       return;
     }
 
     const localProgress = Math.min(1, Math.max(0, (value - start) / (end - start)));
+    if (video.readyState < HTMLMediaElement.HAVE_METADATA) {
+      targetTimeRef.current = localProgress * CLIP_DURATION;
+      return;
+    }
     const duration = Number.isFinite(video.duration) ? video.duration : CLIP_DURATION;
     const cleanDuration = duration - 0.04;
-    const targetTime = Math.min(cleanDuration, localProgress * cleanDuration);
-
-    if (Math.abs(video.currentTime - targetTime) <= 0.035) {
-      return;
-    }
-
-    if (isSeekingRef.current || video.seeking) {
-      pendingTimeRef.current = targetTime;
-      return;
-    }
-
-    isSeekingRef.current = true;
-    video.currentTime = targetTime;
+    targetTimeRef.current = Math.min(cleanDuration, localProgress * cleanDuration);
   });
 
   return (
@@ -202,6 +241,8 @@ export function DinoStory() {
   const sectionRef = useRef<HTMLElement | null>(null);
   const [activeScene, setActiveScene] = useState(0);
   const [mediaRequested, setMediaRequested] = useState(false);
+  const [storyPlaybackActive, setStoryPlaybackActive] = useState(true);
+  const constrainedMedia = useConstrainedMediaDevice();
   const reducedMotion = useReducedMotion();
   const { scrollYProgress } = useScroll({
     target: sectionRef,
@@ -213,10 +254,15 @@ export function DinoStory() {
     mass: 0.5,
     restDelta: 0.0001,
   });
-  const progressScale = useTransform(cinematicProgress, [0, 1], [0, 1]);
+  const storyProgress = cinematicProgress;
+  const progressScale = useTransform(storyProgress, [0, 1], [0, 1]);
 
-  useMotionValueEvent(cinematicProgress, "change", (value) => {
+  useMotionValueEvent(storyProgress, "change", (value) => {
     setActiveScene(Math.min(SCENE_COUNT - 1, Math.floor(value * SCENE_COUNT)));
+  });
+
+  useMotionValueEvent(scrollYProgress, "change", (value) => {
+    setStoryPlaybackActive(value < 0.999);
   });
 
   useEffect(() => {
@@ -276,8 +322,10 @@ export function DinoStory() {
             <StoryVideo
               key={scene.title}
               index={index}
-              progress={cinematicProgress}
-              shouldLoad={mediaRequested}
+              progress={storyProgress}
+              shouldLoad={mediaRequested
+                && (constrainedMedia || (index >= activeScene - 1 && index <= activeScene + 2))}
+              canSeek={storyPlaybackActive}
             />
           ))}
         </div>
@@ -289,7 +337,7 @@ export function DinoStory() {
             key={scene.title}
             scene={scene}
             index={index}
-            progress={cinematicProgress}
+            progress={storyProgress}
             active={activeScene === index}
           />
         ))}
