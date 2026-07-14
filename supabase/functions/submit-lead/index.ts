@@ -23,6 +23,7 @@ type TurnstileResult = {
 };
 
 const jsonHeaders = { "Content-Type": "application/json; charset=utf-8" };
+const productionOrigins = ["https://wowstorg.ru", "https://www.wowstorg.ru"];
 
 function env(name: string): string {
   const value = Deno.env.get(name)?.trim();
@@ -40,7 +41,12 @@ function supabaseAdminKey(): string {
 }
 
 function allowedOrigins(): Set<string> {
-  return new Set(env("ALLOWED_ORIGINS").split(",").map((value) => value.trim().replace(/\/$/, "")).filter(Boolean));
+  const configuredOrigins = Deno.env.get("ALLOWED_ORIGINS")
+    ?.split(",")
+    .map((value) => value.trim().replace(/\/$/, ""))
+    .filter(Boolean) ?? [];
+
+  return new Set([...productionOrigins, ...configuredOrigins]);
 }
 
 function corsHeaders(origin: string): Record<string, string> {
@@ -116,13 +122,7 @@ function parseDate(value: unknown, flexible: boolean): string | null {
 }
 
 Deno.serve(async (request) => {
-  let origins: Set<string>;
-  try {
-    origins = allowedOrigins();
-  } catch {
-    return Response.json({ error: "service_unavailable" }, { status: 503, headers: jsonHeaders });
-  }
-
+  const origins = allowedOrigins();
   const origin = request.headers.get("origin")?.replace(/\/$/, "") ?? "";
   if (!origin || !origins.has(origin)) {
     return Response.json({ error: "origin_not_allowed" }, { status: 403, headers: jsonHeaders });
