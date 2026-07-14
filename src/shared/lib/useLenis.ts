@@ -5,6 +5,10 @@ function prefersReducedMotion() {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
+function prefersNativeTouchScroll() {
+  return window.matchMedia("(pointer: coarse)").matches;
+}
+
 export function useLenis() {
   useEffect(() => {
     let lenis: Lenis | null = null;
@@ -37,7 +41,7 @@ export function useLenis() {
     scheduleHashScroll();
     void document.fonts.ready.then(scheduleHashScroll);
 
-    if (prefersReducedMotion()) {
+    if (prefersReducedMotion() || prefersNativeTouchScroll()) {
       return () => {
         cancelAnimationFrame(hashFrame);
         cancelAnimationFrame(hashFrameAfterLayout);

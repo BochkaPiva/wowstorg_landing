@@ -1172,6 +1172,8 @@ a:focus-visible {
     max-width: none;
     object-position: center;
     transform: translateX(-50%);
+    -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 82%, transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 0%, #000 82%, transparent 100%);
   }
 
   .hero__content {
@@ -5143,6 +5145,11 @@ html.has-open-dialog body {
     aspect-ratio: 16 / 9;
   }
 
+  .site-footer__visual img {
+    -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 78%, transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 0%, #000 78%, transparent 100%);
+  }
+
   .site-footer__visual::before {
     background: linear-gradient(180deg, #030303 0%, transparent 22%, transparent 80%, #030303 100%);
   }
@@ -5169,6 +5176,7 @@ html.has-open-dialog body {
 
   .site-footer__stage {
     min-height: 0;
+    border-bottom-color: transparent;
   }
 
   .site-footer__closing {
@@ -5186,6 +5194,7 @@ html.has-open-dialog body {
 
   .site-footer__visual img {
     object-position: 50% 40%;
+    transform: scale(1.015);
   }
 
   .site-footer__body {
