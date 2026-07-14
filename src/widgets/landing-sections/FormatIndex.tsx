@@ -1,7 +1,8 @@
-import { loadPreviewContent } from "@features/admin-content/localDraftRepository";
+import { useSiteContent } from "@features/site-content/SiteContentContext";
 
 export function FormatIndex() {
-  const content = loadPreviewContent().formats;
+  const { content: siteContent } = useSiteContent();
+  const content = siteContent.formats;
 
   return (
     <section className="format-index" id="formats">

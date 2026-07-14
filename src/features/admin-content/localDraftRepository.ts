@@ -1,19 +1,8 @@
-import type { LandingContentDraft, PortfolioProject } from "@entities/admin/model";
+import type { LandingContentDraft } from "@entities/admin/model";
 
 const STORAGE_KEY = "wowstorg:admin-content-draft:v3";
 const PREVIOUS_STORAGE_KEY = "wowstorg:admin-content-draft:v2";
 const LEGACY_STORAGE_KEY = "wowstorg:admin-content-draft:v1";
-
-const draftCase = (number: string, category: string): PortfolioProject => ({
-  number,
-  title: `Кейс ${number}`,
-  meta: `${category} · материалы проекта`,
-  lead: "Здесь появятся реальное название проекта, задача клиента и короткая история события.",
-  facts: ["задача и аудитория", "механика и комплектация", "масштаб и площадка"],
-  result: "После отбора материалов добавим подтверждённый результат, фотографии и факты проекта.",
-  cover: "",
-  gallery: [],
-});
 
 export const defaultLandingContentDraft: LandingContentDraft = {
   version: 3,
@@ -32,14 +21,7 @@ export const defaultLandingContentDraft: LandingContentDraft = {
   },
   trust: {
     label: "Нам доверяют",
-    items: [
-      { name: "Корпоративные клиенты", imagePath: "", href: "" },
-      { name: "Фестивали", imagePath: "", href: "" },
-      { name: "Выставки", imagePath: "", href: "" },
-      { name: "Промо-проекты", imagePath: "", href: "" },
-      { name: "Городские события", imagePath: "", href: "" },
-      { name: "Частные события", imagePath: "", href: "" },
-    ],
+    items: [],
   },
   formats: {
     eyebrow: "Что можно заказать",
@@ -72,9 +54,9 @@ export const defaultLandingContentDraft: LandingContentDraft = {
     title: "Реализованные события.",
     description: "Выберите направление. Внутри — отдельные проекты с фотографиями, задачей, механикой и результатом.",
     collections: [
-      { title: "Тимбилдинги", meta: "Реализованные командные программы", code: "TEAM", projects: [draftCase("01", "Тимбилдинг"), draftCase("02", "Тимбилдинг"), draftCase("03", "Тимбилдинг")] },
-      { title: "Welcome-зоны", meta: "Проекты для встречи и вовлечения гостей", code: "WELCOME", projects: [draftCase("01", "Welcome-зона"), draftCase("02", "Welcome-зона"), draftCase("03", "Welcome-зона")] },
-      { title: "Игровые зоны", meta: "Игровые пространства на событиях", code: "PLAY", projects: [draftCase("01", "Игровая зона"), draftCase("02", "Игровая зона"), draftCase("03", "Игровая зона")] },
+      { title: "Тимбилдинги", meta: "Реализованные командные программы", code: "TEAM", projects: [] },
+      { title: "Welcome-зоны", meta: "Проекты для встречи и вовлечения гостей", code: "WELCOME", projects: [] },
+      { title: "Игровые зоны", meta: "Игровые пространства на событиях", code: "PLAY", projects: [] },
     ],
   },
   story: {

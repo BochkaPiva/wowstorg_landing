@@ -1,7 +1,7 @@
 import { ArrowLeft, ArrowRight, Check, ShoppingBag } from "lucide-react";
 import { type FormEvent, useCallback, useMemo, useState } from "react";
 import { useCatalogCart } from "@features/catalog-cart/CatalogCartContext";
-import { loadPreviewContent } from "@features/admin-content/localDraftRepository";
+import { useSiteContent } from "@features/site-content/SiteContentContext";
 import { TurnstileWidget } from "@shared/ui/TurnstileWidget";
 
 type LeadFormState = {
@@ -56,7 +56,7 @@ function ChoiceGroup({ name, options, value, onChange }: {
 }
 
 export function LeadForm() {
-  const previewContent = loadPreviewContent();
+  const { content: previewContent } = useSiteContent();
   const eventTypes = previewContent.leadForm.eventTypes;
   const guestRanges = previewContent.leadForm.guestRanges;
   const contactTypes = previewContent.leadForm.contactTypes;

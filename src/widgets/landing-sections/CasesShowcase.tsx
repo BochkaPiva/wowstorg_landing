@@ -1,10 +1,13 @@
 import { ArrowLeft, ArrowUpRight, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { loadPreviewContent } from "@features/admin-content/localDraftRepository";
+import { useSiteContent } from "@features/site-content/SiteContentContext";
+import { listPortfolio } from "@features/portfolio-data/portfolioRepository";
+import type { PortfolioCollection } from "@entities/admin/model";
 
 export function CasesShowcase() {
-  const content = loadPreviewContent().cases;
-  const caseCollections = content.collections;
+  const { content: siteContent, source } = useSiteContent();
+  const content = siteContent.cases;
+  const [caseCollections, setCaseCollections] = useState<PortfolioCollection[]>(source === "preview" ? content.collections : []);
   const [selectedCollectionIndex, setSelectedCollectionIndex] = useState<number | null>(null);
   const [selectedProjectIndex, setSelectedProjectIndex] = useState<number | null>(null);
   const dialogRef = useRef<HTMLDialogElement | null>(null);
@@ -13,6 +16,34 @@ export function CasesShowcase() {
     ? selectedCollection.projects[selectedProjectIndex]
     : null;
   const isDialogOpen = selectedCollectionIndex !== null;
+
+  useEffect(() => {
+    if (source === "preview") {
+      setCaseCollections(content.collections);
+      return;
+    }
+    let active = true;
+    listPortfolio().then(({ collections, projects }) => {
+      if (!active) return;
+      const codes: Record<string, string> = { teambuilding: "TEAM", welcome: "WELCOME", "game-zone": "PLAY" };
+      setCaseCollections(collections.map((collection) => ({
+        title: collection.title,
+        meta: collection.description,
+        code: codes[collection.id] ?? collection.title.slice(0, 6).toLocaleUpperCase("ru"),
+        projects: projects.filter((project) => project.collectionId === collection.id && project.status === "published").map((project, index) => ({
+          number: String(index + 1).padStart(2, "0"),
+          title: project.title,
+          meta: project.meta,
+          lead: project.lead,
+          facts: project.facts,
+          result: project.result,
+          cover: project.media.find((media) => media.isCover)?.src ?? project.media[0]?.src ?? "",
+          gallery: project.media.map((media) => ({ src: media.src, alt: media.alt })),
+        })),
+      })).filter((collection) => collection.projects.length > 0));
+    }).catch(() => setCaseCollections([]));
+    return () => { active = false; };
+  }, [content.collections, source]);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -45,6 +76,8 @@ export function CasesShowcase() {
     setSelectedProjectIndex(null);
     setSelectedCollectionIndex(null);
   };
+
+  if (!caseCollections.length) return null;
 
   return (
     <section className="cases-showcase" id="cases">
@@ -97,17 +130,11 @@ export function CasesShowcase() {
                 </header>
 
                 <div className="case-detail__gallery" aria-label="Фотографии проекта">
-                  {selectedProject.gallery?.length ? selectedProject.gallery.map((image) => (
+                  {selectedProject.gallery?.map((image) => (
                     <figure key={image.src}>
                       <img src={image.src} alt={image.alt} />
                     </figure>
-                  )) : (
-                    <>
-                      <div className="case-detail__media case-detail__media--lead"><span>Главное фото</span></div>
-                      <div className="case-detail__media"><span>Фото 02</span></div>
-                      <div className="case-detail__media"><span>Фото 03</span></div>
-                    </>
-                  )}
+                  ))}
                 </div>
 
                 <div className="case-detail__story">
@@ -151,7 +178,6 @@ export function CasesShowcase() {
                     <button className="portfolio-card" key={project.number} type="button" onClick={() => setSelectedProjectIndex(index)}>
                       <div className={`portfolio-card__media portfolio-card__media--${selectedCollectionIndex! + 1}`}>
                         {project.cover ? <img src={project.cover} alt="" /> : <span>{project.number}</span>}
-                        <small>Материалы готовятся</small>
                       </div>
                       <span>{project.meta}</span>
                       <h3>{project.title}</h3>

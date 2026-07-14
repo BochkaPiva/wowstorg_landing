@@ -1,8 +1,8 @@
 import { navigationItems, siteConfig } from "@shared/config/site";
-import { loadPreviewContent } from "@features/admin-content/localDraftRepository";
+import { useSiteContent } from "@features/site-content/SiteContentContext";
 
 export function Footer() {
-  const previewContent = loadPreviewContent();
+  const { content: previewContent } = useSiteContent();
   const footerHeading = previewContent.footer.heading.split(" ");
   const footerHeadingBreak = Math.max(1, Math.ceil(footerHeading.length / 2));
 

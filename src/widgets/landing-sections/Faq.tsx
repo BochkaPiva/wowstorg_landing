@@ -2,10 +2,11 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Plus } from "lucide-react";
 import { useState } from "react";
 import { Reveal } from "@shared/ui/Reveal";
-import { loadPreviewContent } from "@features/admin-content/localDraftRepository";
+import { useSiteContent } from "@features/site-content/SiteContentContext";
 
 export function Faq() {
-  const content = loadPreviewContent().faq;
+  const { content: siteContent } = useSiteContent();
+  const content = siteContent.faq;
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   return (

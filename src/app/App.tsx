@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { useLenis } from "@shared/lib/useLenis";
 import { Hero } from "@widgets/hero/Hero";
 import { DinoStory } from "@widgets/dino-story/DinoStory";
@@ -10,20 +10,26 @@ import { TrustMarquee } from "@widgets/landing-sections/TrustMarquee";
 import { CasesShowcase } from "@widgets/landing-sections/CasesShowcase";
 import { CookieConsent } from "@widgets/legal/CookieConsent";
 import { CatalogGateway } from "@widgets/catalog-gateway/CatalogGateway";
-import { CatalogPage } from "@widgets/catalog-page/CatalogPage";
 import { CatalogCartProvider } from "@features/catalog-cart/CatalogCartContext";
-import { AdminPage } from "@widgets/admin-page/AdminPage";
-import { loadPreviewContent } from "@features/admin-content/localDraftRepository";
+import { SiteContentProvider, useSiteContent } from "@features/site-content/SiteContentContext";
+
+const CatalogPage = lazy(() => import("@widgets/catalog-page/CatalogPage").then((module) => ({ default: module.CatalogPage })));
+const AdminPage = lazy(() => import("@widgets/admin-page/AdminPage").then((module) => ({ default: module.AdminPage })));
+
+function RouteLoader() {
+  return <div className="route-loader" role="status" aria-live="polite"><span>Загружаем</span></div>;
+}
 
 function LandingPage() {
   useLenis();
+  const { content } = useSiteContent();
 
   useEffect(() => {
-    const seo = loadPreviewContent().seo;
+    const seo = content.seo;
     document.title = seo.title;
     const description = document.querySelector<HTMLMetaElement>('meta[name="description"]');
     if (description) description.content = seo.description;
-  }, []);
+  }, [content.seo]);
 
   return (
     <main className="page-shell">
@@ -45,12 +51,12 @@ export default function App() {
   const isCatalogPage = pathname === "/catalog";
   const isAdminPage = pathname === "/admin";
 
-  if (isAdminPage) return <AdminPage />;
+  if (isAdminPage) return <Suspense fallback={<RouteLoader />}><AdminPage /></Suspense>;
 
-  return (
+  return <SiteContentProvider>
     <CatalogCartProvider>
-      {isCatalogPage ? <CatalogPage /> : <LandingPage />}
+      {isCatalogPage ? <Suspense fallback={<RouteLoader />}><CatalogPage /></Suspense> : <LandingPage />}
       <CookieConsent />
     </CatalogCartProvider>
-  );
+  </SiteContentProvider>;
 }

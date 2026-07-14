@@ -1,9 +1,11 @@
-import { loadPreviewContent } from "@features/admin-content/localDraftRepository";
+import { useSiteContent } from "@features/site-content/SiteContentContext";
 import { resolvePublicMediaUrl } from "@shared/lib/publicMedia";
 
 export function TrustMarquee() {
-  const content = loadPreviewContent().trust;
+  const { content: siteContent } = useSiteContent();
+  const content = siteContent.trust;
   const row = [...content.items, ...content.items];
+  if (!content.items.length) return null;
 
   return (
     <section className="trust-marquee" aria-label="Форматы событий ВАУСТОРГ">

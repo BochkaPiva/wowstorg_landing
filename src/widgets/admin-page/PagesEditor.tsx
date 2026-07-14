@@ -1,11 +1,14 @@
-import { ExternalLink, Plus, RefreshCcw, Save, Trash2 } from "lucide-react";
-import { type ReactNode, useState } from "react";
-import type { LandingContentDraft, PortfolioProject } from "@entities/admin/model";
+import { Check, ExternalLink, LoaderCircle, Plus, RefreshCcw, Rocket, Save, Trash2 } from "lucide-react";
+import { type ReactNode, useEffect, useState } from "react";
+import type { LandingContentDraft } from "@entities/admin/model";
 import {
   loadLocalDraft,
-  resetLocalDraft,
   saveLocalDraft,
 } from "@features/admin-content/localDraftRepository";
+import { loadLandingDocument, publishLandingDocument, saveLandingDocument, type ContentDocument } from "@features/admin-content/supabaseContentRepository";
+import { useAdminAuth } from "@features/admin-auth/AdminAuthContext";
+import { getPublicMediaUrl, uploadSiteImage } from "@shared/api/supabase";
+import { MediaUploader } from "./MediaUploader";
 
 type BlockId =
   | "seo"
@@ -25,7 +28,7 @@ const blocks: Array<{ id: BlockId; title: string; caption: string }> = [
   { id: "trust", title: "Строка направлений", caption: "Бегущая строка" },
   { id: "formats", title: "Форматы", caption: "Основные услуги" },
   { id: "catalog", title: "Каталог", caption: "Витрина разделов" },
-  { id: "cases", title: "Кейсы", caption: "Коллекции и проекты" },
+  { id: "cases", title: "Портфолио", caption: "Заголовок кейсов" },
   { id: "story", title: "История с дино", caption: "Пять сцен" },
   { id: "faq", title: "FAQ", caption: "Вопросы и ответы" },
   { id: "lead", title: "Заявка", caption: "Бриф и контакты" },
@@ -38,7 +41,7 @@ const blockDescriptions: Record<BlockId, string> = {
   trust: "Короткие направления, которые непрерывно движутся под первым экраном.",
   formats: "Главные услуги и ссылка на самостоятельный каталог.",
   catalog: "Редакционная витрина разделов каталога. Карточки товаров редактируются отдельно.",
-  cases: "Направления портфолио, проекты, факты и пути к фотографиям.",
+  cases: "Заголовок портфолио на лендинге. Сами проекты и фотографии редактируются в разделе «Кейсы».",
   story: "Тексты пяти сцен синхронизированы с пятью видео и не могут менять их порядок.",
   faq: "Ответы на частые вопросы перед формой заявки.",
   lead: "Текст короткого брифа, варианты выбора и публичные контакты.",
@@ -93,26 +96,35 @@ function ItemCard({ title, onRemove, children }: { title: string; onRemove?: () 
   );
 }
 
-function makeProject(number: string): PortfolioProject {
-  return {
-    number,
-    title: `Кейс ${number}`,
-    meta: "Материалы проекта",
-    lead: "Коротко опишите задачу клиента и контекст события.",
-    facts: ["задача и аудитория", "механика и комплектация", "масштаб и площадка"],
-    result: "Добавьте подтверждённый результат проекта.",
-    cover: "",
-    gallery: [],
-  };
-}
-
 export function PagesEditor() {
+  const { user, profile } = useAdminAuth();
   const [draft, setDraft] = useState<LandingContentDraft>(() => loadLocalDraft());
+  const [document, setDocument] = useState<ContentDocument | null>(null);
   const [activeBlock, setActiveBlock] = useState<BlockId>("hero");
   const [savedAt, setSavedAt] = useState(draft.updatedAt);
   const [dirty, setDirty] = useState(false);
-  const [caseCollectionIndex, setCaseCollectionIndex] = useState(0);
-  const [caseProjectIndex, setCaseProjectIndex] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const canEdit = profile?.role !== "viewer";
+
+  const load = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const next = await loadLandingDocument();
+      setDocument(next);
+      setDraft(next.content);
+      setSavedAt(next.updatedAt ?? "");
+      setDirty(false);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Не удалось загрузить документ.");
+    } finally { setLoading(false); }
+  };
+
+  useEffect(() => { void load(); }, []);
 
   const mutate = (recipe: (next: LandingContentDraft) => void) => {
     setDraft((current) => {
@@ -123,24 +135,33 @@ export function PagesEditor() {
     setDirty(true);
   };
 
-  const save = () => {
-    const saved = saveLocalDraft(draft);
-    setDraft(saved);
-    setSavedAt(saved.updatedAt);
-    setDirty(false);
+  const save = async () => {
+    if (!user || !document || !canEdit) return;
+    setSaving(true); setError(null); setMessage(null);
+    try {
+      const saved = await saveLandingDocument({ ...document, content: draft }, user.id);
+      saveLocalDraft(saved.content);
+      setDocument(saved);
+      setDraft(saved.content);
+      setSavedAt(saved.updatedAt ?? "");
+      setDirty(false);
+      setMessage("Черновик сохранён.");
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Не удалось сохранить документ."); }
+    finally { setSaving(false); }
   };
 
-  const reset = () => {
-    setDraft(resetLocalDraft());
-    setSavedAt("");
-    setDirty(false);
-    setCaseCollectionIndex(0);
-    setCaseProjectIndex(0);
+  const publish = async () => {
+    if (!document || dirty) return;
+    setPublishing(true); setError(null); setMessage(null);
+    try {
+      const nextVersion = await publishLandingDocument(document);
+      setDocument({ ...document, version: nextVersion });
+      setMessage(`Версия ${nextVersion} опубликована на сайте.`);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Не удалось опубликовать документ."); }
+    finally { setPublishing(false); }
   };
 
   const activeMeta = blocks.find((block) => block.id === activeBlock) ?? blocks[0];
-  const selectedCollection = draft.cases.collections[caseCollectionIndex];
-  const selectedProject = selectedCollection?.projects[caseProjectIndex];
 
   const renderEditor = () => {
     if (activeBlock === "seo") {
@@ -173,7 +194,7 @@ export function PagesEditor() {
         <Field label="Подпись"><input value={draft.trust.label} onChange={(event) => mutate((next) => { next.trust.label = event.target.value; })} /></Field>
         {draft.trust.items.map((item, index) => <ItemCard key={index} title={item.name || `Логотип ${index + 1}`} onRemove={() => mutate((next) => { next.trust.items.splice(index, 1); })}>
           <Field label="Название" hint="Используется как alt-текст и fallback"><input value={item.name} onChange={(event) => mutate((next) => { next.trust.items[index].name = event.target.value; })} /></Field>
-          <Field label="Файл в Storage" hint="Например: logos/sber.webp"><input value={item.imagePath} placeholder="logos/company.webp" onChange={(event) => mutate((next) => { next.trust.items[index].imagePath = event.target.value; })} /></Field>
+          {item.imagePath ? <div className="admin-logoPreview"><img src={getPublicMediaUrl(item.imagePath)} alt={item.name} /><button type="button" onClick={() => mutate((next) => { next.trust.items[index].imagePath = ""; })}><Trash2 size={15} /> Убрать</button></div> : <MediaUploader multiple={false} label="Загрузить логотип" onUpload={async (file) => { const path = await uploadSiteImage("logos", file); mutate((next) => { next.trust.items[index].imagePath = path; }); }} />}
           <Field label="Ссылка" hint="Необязательно"><input type="url" value={item.href} placeholder="https://company.ru" onChange={(event) => mutate((next) => { next.trust.items[index].href = event.target.value; })} /></Field>
         </ItemCard>)}
         <button className="admin-addButton" type="button" onClick={() => mutate((next) => { next.trust.items.push({ name: "Новый клиент", imagePath: "", href: "" }); })}><Plus size={16} /> Добавить логотип</button>
@@ -239,61 +260,13 @@ export function PagesEditor() {
     }
 
     if (activeBlock === "cases") {
-      return <>
-        <div className="admin-formSection">
-          <h3>Заголовок портфолио</h3>
-          <div className="admin-fieldPair">
-            <Field label="Надзаголовок"><input value={draft.cases.eyebrow} onChange={(event) => mutate((next) => { next.cases.eyebrow = event.target.value; })} /></Field>
-            <Field label="Заголовок"><input value={draft.cases.title} onChange={(event) => mutate((next) => { next.cases.title = event.target.value; })} /></Field>
-          </div>
-          <Field label="Описание"><textarea rows={3} value={draft.cases.description} onChange={(event) => mutate((next) => { next.cases.description = event.target.value; })} /></Field>
-        </div>
-        <div className="admin-formSection">
-          <h3>Направление</h3>
-          <div className="admin-toolbarRow">
-            <select value={caseCollectionIndex} onChange={(event) => { setCaseCollectionIndex(Number(event.target.value)); setCaseProjectIndex(0); }}>
-              {draft.cases.collections.map((collection, index) => <option key={`${collection.title}-${index}`} value={index}>{collection.title}</option>)}
-            </select>
-            <button className="admin-addButton" type="button" onClick={() => mutate((next) => { next.cases.collections.push({ title: "Новое направление", meta: "Описание направления", code: "NEW", projects: [makeProject("01")] }); setCaseCollectionIndex(draft.cases.collections.length); setCaseProjectIndex(0); })}><Plus size={16} /> Добавить направление</button>
-          </div>
-          {selectedCollection ? <ItemCard title={selectedCollection.title} onRemove={draft.cases.collections.length > 1 ? () => { mutate((next) => { next.cases.collections.splice(caseCollectionIndex, 1); }); setCaseCollectionIndex(0); setCaseProjectIndex(0); } : undefined}>
-            <div className="admin-fieldPair">
-              <Field label="Название"><input value={selectedCollection.title} onChange={(event) => mutate((next) => { next.cases.collections[caseCollectionIndex].title = event.target.value; })} /></Field>
-              <Field label="Код постера"><input value={selectedCollection.code} onChange={(event) => mutate((next) => { next.cases.collections[caseCollectionIndex].code = event.target.value.toUpperCase(); })} /></Field>
-            </div>
-            <Field label="Подпись"><input value={selectedCollection.meta} onChange={(event) => mutate((next) => { next.cases.collections[caseCollectionIndex].meta = event.target.value; })} /></Field>
-          </ItemCard> : null}
-        </div>
-        {selectedCollection ? <div className="admin-formSection">
-          <h3>Проект</h3>
-          <div className="admin-toolbarRow">
-            <select value={caseProjectIndex} onChange={(event) => setCaseProjectIndex(Number(event.target.value))}>
-              {selectedCollection.projects.map((project, index) => <option key={`${project.number}-${index}`} value={index}>{project.number} · {project.title}</option>)}
-            </select>
-            <button className="admin-addButton" type="button" onClick={() => { const number = String(selectedCollection.projects.length + 1).padStart(2, "0"); mutate((next) => { next.cases.collections[caseCollectionIndex].projects.push(makeProject(number)); }); setCaseProjectIndex(selectedCollection.projects.length); }}><Plus size={16} /> Добавить проект</button>
-          </div>
-          {selectedProject ? <ItemCard title={`${selectedProject.number} · ${selectedProject.title}`} onRemove={selectedCollection.projects.length > 1 ? () => { mutate((next) => { next.cases.collections[caseCollectionIndex].projects.splice(caseProjectIndex, 1); }); setCaseProjectIndex(0); } : undefined}>
-            <div className="admin-fieldPair">
-              <Field label="Номер"><input value={selectedProject.number} onChange={(event) => mutate((next) => { next.cases.collections[caseCollectionIndex].projects[caseProjectIndex].number = event.target.value; })} /></Field>
-              <Field label="Название"><input value={selectedProject.title} onChange={(event) => mutate((next) => { next.cases.collections[caseCollectionIndex].projects[caseProjectIndex].title = event.target.value; })} /></Field>
-            </div>
-            <Field label="Мета-строка"><input value={selectedProject.meta} onChange={(event) => mutate((next) => { next.cases.collections[caseCollectionIndex].projects[caseProjectIndex].meta = event.target.value; })} /></Field>
-            <Field label="Вводный текст"><textarea rows={3} value={selectedProject.lead} onChange={(event) => mutate((next) => { next.cases.collections[caseCollectionIndex].projects[caseProjectIndex].lead = event.target.value; })} /></Field>
-            <Field label="Факты"><StringListEditor values={selectedProject.facts} addLabel="Добавить факт" onChange={(values) => mutate((next) => { next.cases.collections[caseCollectionIndex].projects[caseProjectIndex].facts = values; })} /></Field>
-            <Field label="Результат"><textarea rows={3} value={selectedProject.result} onChange={(event) => mutate((next) => { next.cases.collections[caseCollectionIndex].projects[caseProjectIndex].result = event.target.value; })} /></Field>
-            <Field label="Обложка" hint="Например, /cases/project/cover.webp"><input value={selectedProject.cover} onChange={(event) => mutate((next) => { next.cases.collections[caseCollectionIndex].projects[caseProjectIndex].cover = event.target.value; })} /></Field>
-            <div className="admin-subsection">
-              <strong>Галерея</strong>
-              {selectedProject.gallery.map((image, imageIndex) => <div className="admin-galleryRow" key={imageIndex}>
-                <Field label={`Фото ${imageIndex + 1}`}><input value={image.src} placeholder="/cases/project/photo.webp" onChange={(event) => mutate((next) => { next.cases.collections[caseCollectionIndex].projects[caseProjectIndex].gallery[imageIndex].src = event.target.value; })} /></Field>
-                <Field label="Alt-текст"><input value={image.alt} onChange={(event) => mutate((next) => { next.cases.collections[caseCollectionIndex].projects[caseProjectIndex].gallery[imageIndex].alt = event.target.value; })} /></Field>
-                <button type="button" aria-label="Удалить фото" onClick={() => mutate((next) => { next.cases.collections[caseCollectionIndex].projects[caseProjectIndex].gallery.splice(imageIndex, 1); })}><Trash2 size={16} /></button>
-              </div>)}
-              <button className="admin-addButton" type="button" onClick={() => mutate((next) => { next.cases.collections[caseCollectionIndex].projects[caseProjectIndex].gallery.push({ src: "", alt: "" }); })}><Plus size={16} /> Добавить фото</button>
-            </div>
-          </ItemCard> : null}
-        </div> : null}
-      </>;
+      return <div className="admin-formSection">
+        <h3>Заголовок портфолио</h3>
+        <Field label="Надзаголовок"><input value={draft.cases.eyebrow} onChange={(event) => mutate((next) => { next.cases.eyebrow = event.target.value; })} /></Field>
+        <Field label="Заголовок"><input value={draft.cases.title} onChange={(event) => mutate((next) => { next.cases.title = event.target.value; })} /></Field>
+        <Field label="Описание"><textarea rows={4} value={draft.cases.description} onChange={(event) => mutate((next) => { next.cases.description = event.target.value; })} /></Field>
+        <p className="admin-inlineNotice">Названия проектов, факты и фотогалереи находятся в отдельном разделе «Кейсы».</p>
+      </div>;
     }
 
     if (activeBlock === "story") {
@@ -383,11 +356,15 @@ export function PagesEditor() {
         <header>
           <div><span>{activeMeta.caption}</span><h2>{activeMeta.title}</h2><p>{blockDescriptions[activeBlock]}</p></div>
           <div className="admin-editorActions">
-            <button className="admin-quietButton" type="button" onClick={reset}><RefreshCcw size={16} /> Сбросить</button>
-            <button className="admin-primaryButton" type="button" onClick={save} disabled={!dirty}><Save size={16} /> Сохранить</button>
+            <button className="admin-quietButton" type="button" onClick={() => void load()} disabled={loading || saving}><RefreshCcw size={16} /> Обновить</button>
+            <button className="admin-primaryButton" type="button" onClick={() => void save()} disabled={!dirty || saving || !canEdit}>{saving ? <LoaderCircle className="is-spinning" size={16} /> : <Save size={16} />} Сохранить</button>
+            <button className="admin-publishButton" type="button" onClick={() => void publish()} disabled={dirty || !document?.id || publishing || !canEdit}>{publishing ? <LoaderCircle className="is-spinning" size={16} /> : <Rocket size={16} />} Опубликовать</button>
           </div>
         </header>
 
+        {loading ? <div className="admin-listState"><LoaderCircle className="is-spinning" size={22} /> Загружаем документ</div> : null}
+        {message ? <p className="admin-successMessage"><Check size={16} />{message}</p> : null}
+        {error ? <p className="admin-formError" role="alert">{error}</p> : null}
         {renderEditor()}
 
         <footer className="admin-editorFooter">

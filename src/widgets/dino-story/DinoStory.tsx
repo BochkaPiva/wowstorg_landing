@@ -9,7 +9,7 @@ import {
 } from "framer-motion";
 import { ArrowUpRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { loadPreviewContent } from "@features/admin-content/localDraftRepository";
+import { useSiteContent } from "@features/site-content/SiteContentContext";
 
 const SCENE_COUNT = 5;
 const CLIP_DURATION = 5.09;
@@ -156,7 +156,8 @@ function StoryCopy({
 }
 
 export function DinoStory() {
-  const content = loadPreviewContent().story;
+  const { content: siteContent } = useSiteContent();
+  const content = siteContent.story;
   const scenes: StoryScene[] = content.scenes.slice(0, SCENE_COUNT);
   const sectionRef = useRef<HTMLElement | null>(null);
   const [activeScene, setActiveScene] = useState(0);

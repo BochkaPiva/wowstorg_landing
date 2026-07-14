@@ -1,12 +1,13 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ArrowUpRight } from "lucide-react";
 import { useState } from "react";
-import { loadPreviewContent } from "@features/admin-content/localDraftRepository";
+import { useSiteContent } from "@features/site-content/SiteContentContext";
 
 export function CatalogGateway() {
   const [activeIndex, setActiveIndex] = useState(0);
   const reducedMotion = useReducedMotion();
-  const content = loadPreviewContent().catalogGateway;
+  const { content: siteContent } = useSiteContent();
+  const content = siteContent.catalogGateway;
   const catalogSections = content.sections;
   const active = catalogSections[activeIndex];
   if (!active) return null;

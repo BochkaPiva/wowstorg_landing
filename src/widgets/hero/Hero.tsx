@@ -2,14 +2,14 @@ import { Menu, X } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { navigationItems, siteConfig } from "@shared/config/site";
-import { loadPreviewContent } from "@features/admin-content/localDraftRepository";
+import { useSiteContent } from "@features/site-content/SiteContentContext";
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
 export function Hero() {
-  const previewContent = loadPreviewContent();
+  const { content: previewContent } = useSiteContent();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const targetTime = useRef(0);
   const smoothTime = useRef(0);
