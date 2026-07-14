@@ -883,6 +883,8 @@ a:focus-visible {
 }
 
 .dino-story__media,
+.dino-story__scene,
+.dino-story__poster,
 .dino-story__video,
 .dino-story__vignette {
   position: absolute;
@@ -893,31 +895,51 @@ a:focus-visible {
   z-index: 1;
 }
 
+.dino-story__scene {
+  overflow: hidden;
+  pointer-events: none;
+  will-change: opacity;
+}
+
+.dino-story__poster,
 .dino-story__video {
   width: 100%;
   height: 100%;
   object-fit: contain;
   pointer-events: none;
-  will-change: opacity;
 }
 
-.dino-story__video--1 {
+.dino-story__poster {
+  z-index: 0;
+}
+
+.dino-story__video {
+  z-index: 1;
+  opacity: 0;
+  transition: opacity 240ms var(--ease-out);
+}
+
+.dino-story__video.is-ready {
+  opacity: 1;
+}
+
+.dino-story__scene--1 {
   transform: translateX(13%) scale(1);
 }
 
-.dino-story__video--2 {
+.dino-story__scene--2 {
   transform: translateX(-14%) scale(1.18);
 }
 
-.dino-story__video--3 {
+.dino-story__scene--3 {
   transform: translateX(14%) scale(1.2);
 }
 
-.dino-story__video--4 {
+.dino-story__scene--4 {
   transform: translateX(14%) scale(1.18);
 }
 
-.dino-story__video--5 {
+.dino-story__scene--5 {
   transform: translateX(-15%) scale(1.08);
 }
 
@@ -1225,20 +1247,20 @@ a:focus-visible {
     height: 700dvh;
   }
 
-  .dino-story__video {
+  .dino-story__scene {
     top: -13%;
     height: 78%;
     transform: scale(1.42);
   }
 
-  .dino-story__video--2,
-  .dino-story__video--3,
-  .dino-story__video--4,
-  .dino-story__video--5 {
+  .dino-story__scene--2,
+  .dino-story__scene--3,
+  .dino-story__scene--4,
+  .dino-story__scene--5 {
     transform: scale(1.42);
   }
 
-  .dino-story__video--1 {
+  .dino-story__scene--1 {
     transform: scale(1.65);
   }
 
@@ -5107,7 +5129,7 @@ html.has-open-dialog body {
 
 @media (max-width: 960px) {
   .site-footer__stage {
-    min-height: 740px;
+    min-height: 0;
     grid-template-columns: 1fr;
   }
 
@@ -5117,7 +5139,8 @@ html.has-open-dialog body {
   }
 
   .site-footer__visual {
-    min-height: 390px;
+    min-height: 0;
+    aspect-ratio: 16 / 9;
   }
 
   .site-footer__visual::before {
@@ -5145,7 +5168,7 @@ html.has-open-dialog body {
   }
 
   .site-footer__stage {
-    min-height: 670px;
+    min-height: 0;
   }
 
   .site-footer__closing {
@@ -5157,7 +5180,8 @@ html.has-open-dialog body {
   }
 
   .site-footer__visual {
-    min-height: 320px;
+    min-height: 0;
+    aspect-ratio: 16 / 9;
   }
 
   .site-footer__visual img {

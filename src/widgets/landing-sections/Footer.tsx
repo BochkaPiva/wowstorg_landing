@@ -15,7 +15,14 @@ export function Footer() {
           <p>{previewContent.footer.description}</p>
         </div>
         <div className="site-footer__visual" aria-hidden="true">
-          <img src="/footer-dino.png" alt="" />
+          <img
+            src="/footer-dino.webp"
+            alt=""
+            width="1400"
+            height="788"
+            loading="lazy"
+            decoding="async"
+          />
         </div>
       </div>
 

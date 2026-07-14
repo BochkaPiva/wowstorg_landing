@@ -38,10 +38,19 @@ function useSceneOpacity(progress: MotionValue<number>, index: number) {
   return useTransform(progress, [start, start + transition, end - transition, end], [0, 1, 1, 0]);
 }
 
-function StoryVideo({ index, progress }: { index: number; progress: MotionValue<number> }) {
+function StoryVideo({
+  index,
+  progress,
+  shouldLoad,
+}: {
+  index: number;
+  progress: MotionValue<number>;
+  shouldLoad: boolean;
+}) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const isSeekingRef = useRef(false);
   const pendingTimeRef = useRef<number | null>(null);
+  const [frameReady, setFrameReady] = useState(false);
   const opacity = useSceneOpacity(progress, index);
 
   useEffect(() => {
@@ -66,6 +75,7 @@ function StoryVideo({ index, progress }: { index: number; progress: MotionValue<
 
     const onSeeked = () => {
       isSeekingRef.current = false;
+      setFrameReady(true);
       const pendingTime = pendingTimeRef.current;
       pendingTimeRef.current = null;
 
@@ -74,9 +84,25 @@ function StoryVideo({ index, progress }: { index: number; progress: MotionValue<
       }
     };
 
+    const onLoadedData = () => setFrameReady(true);
+    const onLoadedMetadata = () => {
+      const value = progress.get();
+      const start = index / SCENE_COUNT;
+      const end = (index + 1) / SCENE_COUNT;
+      const localProgress = Math.min(1, Math.max(0, (value - start) / (end - start)));
+      const duration = Number.isFinite(video.duration) ? video.duration : CLIP_DURATION;
+      seekTo(Math.min(duration - 0.04, localProgress * (duration - 0.04)));
+    };
+
+    video.addEventListener("loadeddata", onLoadedData);
+    video.addEventListener("loadedmetadata", onLoadedMetadata);
     video.addEventListener("seeked", onSeeked);
-    return () => video.removeEventListener("seeked", onSeeked);
-  }, []);
+    return () => {
+      video.removeEventListener("loadeddata", onLoadedData);
+      video.removeEventListener("loadedmetadata", onLoadedMetadata);
+      video.removeEventListener("seeked", onSeeked);
+    };
+  }, [index, progress, shouldLoad]);
 
   useMotionValueEvent(progress, "change", (value) => {
     const video = videoRef.current;
@@ -106,17 +132,31 @@ function StoryVideo({ index, progress }: { index: number; progress: MotionValue<
   });
 
   return (
-    <motion.video
-      ref={videoRef}
-      className={`dino-story__video dino-story__video--${index + 1}`}
+    <motion.div
+      className={`dino-story__scene dino-story__scene--${index + 1}`}
       style={{ opacity }}
-      src={`/dino/${index + 1}.mp4`}
-      preload={index < 2 ? "auto" : "metadata"}
-      muted
-      playsInline
-      disablePictureInPicture
       aria-hidden="true"
-    />
+    >
+      <img
+        className="dino-story__poster"
+        src={`/dino/${index + 1}-poster.webp`}
+        alt=""
+        width="1280"
+        height="720"
+        loading="eager"
+        decoding="async"
+        fetchPriority={index === 0 ? "high" : "low"}
+      />
+      <video
+        ref={videoRef}
+        className={`dino-story__video ${frameReady ? "is-ready" : ""}`}
+        src={shouldLoad ? `/dino/${index + 1}.mp4` : undefined}
+        preload={shouldLoad ? "auto" : "none"}
+        muted
+        playsInline
+        disablePictureInPicture
+      />
+    </motion.div>
   );
 }
 
@@ -161,6 +201,7 @@ export function DinoStory() {
   const scenes: StoryScene[] = content.scenes.slice(0, SCENE_COUNT);
   const sectionRef = useRef<HTMLElement | null>(null);
   const [activeScene, setActiveScene] = useState(0);
+  const [mediaRequested, setMediaRequested] = useState(false);
   const reducedMotion = useReducedMotion();
   const { scrollYProgress } = useScroll({
     target: sectionRef,
@@ -178,6 +219,27 @@ export function DinoStory() {
     setActiveScene(Math.min(SCENE_COUNT - 1, Math.floor(value * SCENE_COUNT)));
   });
 
+  useEffect(() => {
+    const section = sectionRef.current;
+    if (!section || typeof IntersectionObserver === "undefined") {
+      setMediaRequested(true);
+      return undefined;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setMediaRequested(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "1200px 0px" },
+    );
+
+    observer.observe(section);
+    return () => observer.disconnect();
+  }, []);
+
   if (reducedMotion) {
     return (
       <section className="dino-story dino-story--reduced" id="story">
@@ -186,7 +248,14 @@ export function DinoStory() {
             key={scene.title}
             className="dino-story__reducedScene"
           >
-            <video src={`/dino/${index + 1}.mp4`} muted playsInline preload="metadata" aria-hidden="true" />
+            <video
+              src={`/dino/${index + 1}.mp4`}
+              poster={`/dino/${index + 1}-poster.webp`}
+              muted
+              playsInline
+              preload="metadata"
+              aria-hidden="true"
+            />
             <div>
               <h2>{scene.title}</h2>
               <p>{scene.text}</p>
@@ -204,7 +273,12 @@ export function DinoStory() {
         <div className="dino-story__chapterLabel">{content.label}</div>
         <div className="dino-story__media" aria-hidden="true">
           {scenes.map((scene, index) => (
-            <StoryVideo key={scene.title} index={index} progress={cinematicProgress} />
+            <StoryVideo
+              key={scene.title}
+              index={index}
+              progress={cinematicProgress}
+              shouldLoad={mediaRequested}
+            />
           ))}
         </div>
 
