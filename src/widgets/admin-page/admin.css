@@ -1586,6 +1586,33 @@
   line-height: 1.5;
 }
 
+.admin-legalSection {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--admin-line);
+}
+
+.admin-legalSection__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.admin-legalSection__header button {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  color: var(--admin-muted);
+  background: transparent;
+  border: 1px solid var(--admin-line);
+  border-radius: 50%;
+  place-items: center;
+  cursor: pointer;
+}
+
 .admin-successMessage {
   background: #e9f4e9;
   color: #2f6a36;

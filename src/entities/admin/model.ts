@@ -58,6 +58,17 @@ export type StorySceneContent = {
   action: ContentLink | null;
 };
 
+export type LegalDocumentContent = {
+  title: string;
+  status: string;
+  introduction: string;
+  revision: string;
+  sections: Array<{
+    title: string;
+    body: string;
+  }>;
+};
+
 export type LandingContentDraft = {
   version: 3;
   updatedAt: string;
@@ -119,6 +130,11 @@ export type LandingContentDraft = {
     email: string;
     phones: [string, string];
     city: string;
+  };
+  legal: {
+    privacy: LegalDocumentContent;
+    personalData: LegalDocumentContent;
+    cookies: LegalDocumentContent;
   };
   footer: {
     heading: string;

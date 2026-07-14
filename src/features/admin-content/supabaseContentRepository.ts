@@ -1,5 +1,5 @@
 import type { LandingContentDraft } from "@entities/admin/model";
-import { defaultLandingContentDraft } from "./localDraftRepository";
+import { defaultLandingContentDraft, normalizeLandingContent } from "./localDraftRepository";
 import { requireSupabase } from "@shared/api/supabase";
 
 export type ContentDocument = {
@@ -23,7 +23,7 @@ export async function loadLandingDocument(): Promise<ContentDocument> {
   if (error) throw error;
   return {
     id: data?.id ?? null,
-    content: isLandingContent(data?.draft_payload) ? data.draft_payload : structuredClone(defaultLandingContentDraft),
+    content: isLandingContent(data?.draft_payload) ? normalizeLandingContent(data.draft_payload) : structuredClone(defaultLandingContentDraft),
     version: data?.version ?? 1,
     updatedAt: data?.updated_at ?? null,
   };

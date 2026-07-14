@@ -13,6 +13,7 @@ import { useSiteContent } from "@features/site-content/SiteContentContext";
 
 const SCENE_COUNT = 5;
 const CLIP_DURATION = 5.09;
+const VIDEO_SOURCES = Array.from({ length: SCENE_COUNT }, (_, index) => `/dino/${index + 1}.mp4`);
 
 type StoryScene = {
   title: string;
@@ -37,6 +38,54 @@ function useNativeStoryProgress() {
   return enabled;
 }
 
+function useStoryVideoSources(enabled: boolean, useDirectSources: boolean) {
+  const [sources, setSources] = useState<Array<string | undefined>>(() => Array(SCENE_COUNT).fill(undefined));
+
+  useEffect(() => {
+    if (!enabled) return undefined;
+    if (useDirectSources) {
+      setSources(VIDEO_SOURCES);
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    const objectUrls: string[] = [];
+
+    VIDEO_SOURCES.forEach((source, index) => {
+      void fetch(source, { cache: "force-cache", signal: controller.signal })
+        .then((response) => {
+          if (!response.ok) throw new Error(`Video preload failed: ${response.status}`);
+          return response.blob();
+        })
+        .then((blob) => {
+          if (controller.signal.aborted) return;
+          const objectUrl = URL.createObjectURL(blob);
+          objectUrls.push(objectUrl);
+          setSources((current) => {
+            const next = [...current];
+            next[index] = objectUrl;
+            return next;
+          });
+        })
+        .catch(() => {
+          if (controller.signal.aborted) return;
+          setSources((current) => {
+            const next = [...current];
+            next[index] = source;
+            return next;
+          });
+        });
+    });
+
+    return () => {
+      controller.abort();
+      objectUrls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [enabled, useDirectSources]);
+
+  return sources;
+}
+
 function useSceneOpacity(progress: MotionValue<number>, index: number) {
   const start = index / SCENE_COUNT;
   const end = (index + 1) / SCENE_COUNT;
@@ -56,18 +105,19 @@ function useSceneOpacity(progress: MotionValue<number>, index: number) {
 function StoryVideo({
   index,
   progress,
-  shouldLoad,
+  src,
   canSeek,
 }: {
   index: number;
   progress: MotionValue<number>;
-  shouldLoad: boolean;
+  src?: string;
   canSeek: boolean;
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const targetTimeRef = useRef(0);
   const [frameReady, setFrameReady] = useState(false);
   const opacity = useSceneOpacity(progress, index);
+  const shouldLoad = Boolean(src);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -76,7 +126,7 @@ function StoryVideo({
     if (!video) return;
     video.pause();
     video.load();
-  }, [shouldLoad]);
+  }, [src]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -185,12 +235,11 @@ function StoryVideo({
         height="720"
         loading="eager"
         decoding="async"
-        fetchPriority={index === 0 ? "high" : "low"}
       />
       <video
         ref={videoRef}
         className={`dino-story__video ${frameReady ? "is-ready" : ""}`}
-        src={shouldLoad ? `/dino/${index + 1}.mp4` : undefined}
+        src={src}
         preload={shouldLoad ? "auto" : "none"}
         muted
         playsInline
@@ -205,11 +254,13 @@ function StoryCopy({
   index,
   progress,
   active,
+  staticPosition,
 }: {
   scene: StoryScene;
   index: number;
   progress: MotionValue<number>;
   active: boolean;
+  staticPosition: boolean;
 }) {
   const opacity = useSceneOpacity(progress, index);
   const start = index / SCENE_COUNT;
@@ -219,7 +270,7 @@ function StoryCopy({
   return (
     <motion.div
       className={`dino-story__copy dino-story__copy--${scene.align} dino-story__copy--scene-${index + 1} ${active ? "is-active" : ""}`}
-      style={{ opacity, y }}
+      style={staticPosition ? undefined : { opacity, y }}
       aria-hidden={!active}
     >
       <h2>{scene.title}</h2>
@@ -245,6 +296,7 @@ export function DinoStory() {
   const [storyPlaybackActive, setStoryPlaybackActive] = useState(true);
   const reducedMotion = useReducedMotion();
   const nativeStoryProgress = useNativeStoryProgress();
+  const videoSources = useStoryVideoSources(mediaRequested, nativeStoryProgress);
   const { scrollYProgress } = useScroll({
     target: sectionRef,
     offset: ["start start", "end end"],
@@ -280,7 +332,7 @@ export function DinoStory() {
           observer.disconnect();
         }
       },
-      { rootMargin: "1200px 0px" },
+      { rootMargin: "4000px 0px" },
     );
 
     observer.observe(section);
@@ -315,7 +367,7 @@ export function DinoStory() {
   }
 
   return (
-    <section ref={sectionRef} className="dino-story" id="story" aria-label="Как ВАУСТОРГ собирает событие">
+    <section ref={sectionRef} className={`dino-story ${nativeStoryProgress ? "dino-story--native" : ""}`} id="story" aria-label="Как ВАУСТОРГ собирает событие">
       <div className="dino-story__stage">
         <div className="dino-story__chapterLabel">{content.label}</div>
         <div className="dino-story__media" aria-hidden="true">
@@ -324,8 +376,8 @@ export function DinoStory() {
               key={scene.title}
               index={index}
               progress={storyProgress}
-              shouldLoad={mediaRequested}
-              canSeek={storyPlaybackActive}
+              src={videoSources[index]}
+              canSeek={storyPlaybackActive && Math.abs(activeScene - index) <= 1}
             />
           ))}
         </div>
@@ -339,6 +391,7 @@ export function DinoStory() {
             index={index}
             progress={storyProgress}
             active={activeScene === index}
+            staticPosition={nativeStoryProgress}
           />
         ))}
 

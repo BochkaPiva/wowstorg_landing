@@ -1,6 +1,6 @@
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from "react";
 import type { LandingContentDraft } from "@entities/admin/model";
-import { defaultLandingContentDraft, loadLocalDraft } from "@features/admin-content/localDraftRepository";
+import { defaultLandingContentDraft, loadLocalDraft, normalizeLandingContent } from "@features/admin-content/localDraftRepository";
 import { supabase } from "@shared/api/supabase";
 
 type SiteContentState = {
@@ -32,7 +32,7 @@ export function SiteContentProvider({ children }: { children: ReactNode }) {
       .then(({ data, error }) => {
         if (!active) return;
         if (!error && isLandingContent(data?.payload)) {
-          setState({ content: data.payload, loading: false, source: "published" });
+          setState({ content: normalizeLandingContent(data.payload), loading: false, source: "published" });
         } else {
           setState((current) => ({ ...current, loading: false }));
         }

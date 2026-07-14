@@ -44,7 +44,7 @@ function loadTurnstile(): Promise<TurnstileApi> {
 export function TurnstileWidget({ siteKey, onToken, onError }: {
   siteKey: string;
   onToken: (token: string) => void;
-  onError: () => void;
+  onError: (code?: string) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -64,13 +64,13 @@ export function TurnstileWidget({ siteKey, onToken, onError }: {
           callback: (token: string) => onToken(token),
           "expired-callback": () => onToken(""),
           "timeout-callback": () => onToken(""),
-          "error-callback": () => {
+          "error-callback": (code: string) => {
             onToken("");
-            onError();
+            onError(code);
           },
         });
       })
-      .catch(onError);
+      .catch(() => onError());
 
     return () => {
       cancelled = true;

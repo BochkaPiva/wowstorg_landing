@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { LegalLink } from "./LegalModal";
 
 const STORAGE_KEY = "wowstorg-cookie-choice";
 
@@ -20,7 +21,7 @@ export function CookieConsent() {
     <aside className="cookie-consent" aria-label="Настройки cookie">
       <div>
         <strong>Ваш выбор, без мелкого шрифта.</strong>
-        <p>Необходимые технологии помогают сайту работать. Аналитические cookie включим только с вашего согласия. <a href="/cookies.html">Подробнее</a></p>
+        <p>Необходимые технологии помогают сайту работать. Аналитические cookie включим только с вашего согласия. <LegalLink document="cookies">Подробнее</LegalLink></p>
       </div>
       <div className="cookie-consent__actions">
         <button type="button" onClick={() => choose("necessary")}>Только необходимые</button>

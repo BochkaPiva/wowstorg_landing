@@ -20,6 +20,7 @@ type BlockId =
   | "story"
   | "faq"
   | "lead"
+  | "legal"
   | "footer";
 
 const blocks: Array<{ id: BlockId; title: string; caption: string }> = [
@@ -32,6 +33,7 @@ const blocks: Array<{ id: BlockId; title: string; caption: string }> = [
   { id: "story", title: "История с дино", caption: "Пять сцен" },
   { id: "faq", title: "FAQ", caption: "Вопросы и ответы" },
   { id: "lead", title: "Заявка", caption: "Бриф и контакты" },
+  { id: "legal", title: "Документы", caption: "Политика и согласия" },
   { id: "footer", title: "Футер", caption: "Финальный экран" },
 ];
 
@@ -45,6 +47,7 @@ const blockDescriptions: Record<BlockId, string> = {
   story: "Тексты пяти сцен синхронизированы с пятью видео и не могут менять их порядок.",
   faq: "Ответы на частые вопросы перед формой заявки.",
   lead: "Текст короткого брифа, варианты выбора и публичные контакты.",
+  legal: "Тексты открываются поверх сайта. Изменения публикуются вместе с остальным содержимым лендинга.",
   footer: "Финальное сообщение, география и прямые контакты.",
 };
 
@@ -335,6 +338,37 @@ export function PagesEditor() {
           </div>
         </div>
       </>;
+    }
+
+    if (activeBlock === "legal") {
+      const documents = [
+        { key: "privacy" as const, label: "Политика конфиденциальности" },
+        { key: "personalData" as const, label: "Согласие на обработку данных" },
+        { key: "cookies" as const, label: "Cookie и локальное хранилище" },
+      ];
+
+      return <div className="admin-formSection">
+        <h3>Юридические документы</h3>
+        <p className="admin-inlineNotice">Текст выводится как обычный текст без HTML. Это защищает публичный сайт от внедрения стороннего кода.</p>
+        {documents.map(({ key, label }) => {
+          const document = draft.legal[key];
+          return <ItemCard key={key} title={label}>
+            <Field label="Заголовок"><input value={document.title} onChange={(event) => mutate((next) => { next.legal[key].title = event.target.value; })} /></Field>
+            <Field label="Вводный текст"><textarea rows={3} value={document.introduction} onChange={(event) => mutate((next) => { next.legal[key].introduction = event.target.value; })} /></Field>
+            <Field label="Предупреждение или статус" hint="Можно оставить пустым"><textarea rows={2} value={document.status} onChange={(event) => mutate((next) => { next.legal[key].status = event.target.value; })} /></Field>
+            <Field label="Редакция"><input value={document.revision} onChange={(event) => mutate((next) => { next.legal[key].revision = event.target.value; })} /></Field>
+            {document.sections.map((section, index) => <div className="admin-legalSection" key={`${key}-${index}`}>
+              <div className="admin-legalSection__header">
+                <strong>Раздел {index + 1}</strong>
+                <button type="button" aria-label={`Удалить раздел ${index + 1}`} onClick={() => mutate((next) => { next.legal[key].sections.splice(index, 1); })}><Trash2 size={15} /></button>
+              </div>
+              <Field label="Название раздела"><input value={section.title} onChange={(event) => mutate((next) => { next.legal[key].sections[index].title = event.target.value; })} /></Field>
+              <Field label="Текст раздела"><textarea rows={4} value={section.body} onChange={(event) => mutate((next) => { next.legal[key].sections[index].body = event.target.value; })} /></Field>
+            </div>)}
+            <button className="admin-addButton" type="button" onClick={() => mutate((next) => { next.legal[key].sections.push({ title: "Новый раздел", body: "Текст раздела" }); })}><Plus size={16} /> Добавить раздел</button>
+          </ItemCard>;
+        })}
+      </div>;
     }
 
     return <div className="admin-formSection">

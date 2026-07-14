@@ -177,7 +177,6 @@ export function Hero() {
           width="1280"
           height="720"
           alt=""
-          fetchPriority="high"
           decoding="async"
         />
         <video

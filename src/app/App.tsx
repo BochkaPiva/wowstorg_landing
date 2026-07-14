@@ -9,6 +9,7 @@ import { FormatIndex } from "@widgets/landing-sections/FormatIndex";
 import { TrustMarquee } from "@widgets/landing-sections/TrustMarquee";
 import { CasesShowcase } from "@widgets/landing-sections/CasesShowcase";
 import { CookieConsent } from "@widgets/legal/CookieConsent";
+import { LegalModalProvider } from "@widgets/legal/LegalModal";
 import { CatalogGateway } from "@widgets/catalog-gateway/CatalogGateway";
 import { CatalogCartProvider } from "@features/catalog-cart/CatalogCartContext";
 import { SiteContentProvider, useSiteContent } from "@features/site-content/SiteContentContext";
@@ -54,9 +55,11 @@ export default function App() {
   if (isAdminPage) return <Suspense fallback={<RouteLoader />}><AdminPage /></Suspense>;
 
   return <SiteContentProvider>
-    <CatalogCartProvider>
-      {isCatalogPage ? <Suspense fallback={<RouteLoader />}><CatalogPage /></Suspense> : <LandingPage />}
-      <CookieConsent />
-    </CatalogCartProvider>
+    <LegalModalProvider>
+      <CatalogCartProvider>
+        {isCatalogPage ? <Suspense fallback={<RouteLoader />}><CatalogPage /></Suspense> : <LandingPage />}
+        <CookieConsent />
+      </CatalogCartProvider>
+    </LegalModalProvider>
   </SiteContentProvider>;
 }

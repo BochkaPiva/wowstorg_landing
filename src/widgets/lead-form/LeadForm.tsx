@@ -3,6 +3,7 @@ import { type FormEvent, useCallback, useMemo, useState } from "react";
 import { useCatalogCart } from "@features/catalog-cart/CatalogCartContext";
 import { useSiteContent } from "@features/site-content/SiteContentContext";
 import { TurnstileWidget } from "@shared/ui/TurnstileWidget";
+import { LegalLink } from "@widgets/legal/LegalModal";
 
 type LeadFormState = {
   eventType: string;
@@ -106,9 +107,11 @@ export function LeadForm() {
   };
 
   const handleTurnstileToken = useCallback((token: string) => setTurnstileToken(token), []);
-  const handleTurnstileError = useCallback(() => {
+  const handleTurnstileError = useCallback((code?: string) => {
     setSubmissionStatus("error");
-    setSubmissionMessage("Не удалось загрузить защиту формы. Обновите страницу или свяжитесь с нами напрямую.");
+    setSubmissionMessage(code === "110200"
+      ? "Защита формы ещё не активирована для этого адреса. Пожалуйста, свяжитесь с нами напрямую."
+      : "Не удалось загрузить защиту формы. Обновите страницу или свяжитесь с нами напрямую.");
   }, []);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
@@ -283,7 +286,7 @@ export function LeadForm() {
               <label className="brief-check brief-check--consent">
                 <input type="checkbox" checked={form.consent} required onChange={(event) => update("consent", event.target.checked)} />
                 <span className="brief-check__box"><Check size={14} /></span>
-                <span>Даю <a href="/personal-data-consent.html" target="_blank">согласие на обработку персональных данных</a> и принимаю <a href="/privacy.html" target="_blank">политику конфиденциальности</a>.</span>
+                <span>Даю <LegalLink document="personalData">согласие на обработку персональных данных</LegalLink> и принимаю <LegalLink document="privacy">политику конфиденциальности</LegalLink>.</span>
               </label>
 
               {turnstileSiteKey ? <TurnstileWidget key={challengeKey} siteKey={turnstileSiteKey} onToken={handleTurnstileToken} onError={handleTurnstileError} /> : null}

@@ -1,5 +1,6 @@
 import { navigationItems, siteConfig } from "@shared/config/site";
 import { useSiteContent } from "@features/site-content/SiteContentContext";
+import { LegalLink } from "@widgets/legal/LegalModal";
 
 export function Footer() {
   const { content: previewContent } = useSiteContent();
@@ -49,9 +50,9 @@ export function Footer() {
       <div className="site-footer__legal">
         <span>© 2026 {siteConfig.brandName}</span>
         <div>
-          <a href="/privacy.html">Конфиденциальность</a>
-          <a href="/personal-data-consent.html">Согласие на обработку данных</a>
-          <a href="/cookies.html">Файлы cookie</a>
+          <LegalLink document="privacy">Конфиденциальность</LegalLink>
+          <LegalLink document="personalData">Согласие на обработку данных</LegalLink>
+          <LegalLink document="cookies">Файлы cookie</LegalLink>
         </div>
         <a href="#top">Наверх ↑</a>
       </div>
