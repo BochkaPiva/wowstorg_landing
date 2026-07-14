@@ -162,7 +162,7 @@ export function CatalogManager() {
         <label className="admin-checkField"><input type="checkbox" checked={draft.isFeatured} onChange={(event) => update("isFeatured", event.target.checked)} /><span>Показывать выше остальных</span></label>
       </div>
 
-      <section className="admin-mediaSection"><header><div><h3>Фотографии</h3><p>Первое изображение используется как обложка карточки.</p></div></header>{selectedId ? <MediaUploader onUpload={upload} /> : <p className="admin-inlineNotice">Сохраните карточку, чтобы загрузить изображения.</p>}<div className="admin-mediaGrid">{selected?.media.map((media) => <figure key={media.id}><img src={media.src} alt={media.alt} /><figcaption>{media.alt}</figcaption>{canDeleteMedia ? <button type="button" onClick={() => void deleteCatalogImage(media).then(load)}><Archive size={15} /> Удалить</button> : null}</figure>)}</div></section>
+      <section className="admin-mediaSection"><header><div><h3>Фотографии</h3><p>Можно выбрать сразу несколько файлов. Первое изображение станет обложкой, остальные появятся в галерее карточки.</p></div></header>{selectedId ? <MediaUploader multiple onUpload={upload} label="Добавить фотографии" /> : <p className="admin-inlineNotice">Сохраните карточку, чтобы загрузить изображения.</p>}<div className="admin-mediaGrid">{selected?.media.map((media, index) => <figure key={media.id}><span className="admin-mediaGrid__index">{index === 0 ? "Обложка" : `Фото ${index + 1}`}</span><img src={media.src} alt={media.alt} /><figcaption>{media.alt}</figcaption>{canDeleteMedia ? <button type="button" onClick={() => void deleteCatalogImage(media).then(load)}><Archive size={15} /> Удалить</button> : null}</figure>)}</div></section>
     </section>
   </div>;
 }

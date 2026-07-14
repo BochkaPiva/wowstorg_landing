@@ -52,6 +52,22 @@ export default function App() {
   const isCatalogPage = pathname === "/catalog";
   const isAdminPage = pathname === "/admin";
 
+  useEffect(() => {
+    const canonicalUrl = isCatalogPage
+      ? "https://www.wowstorg.ru/catalog"
+      : "https://www.wowstorg.ru/";
+    const robotsContent = isAdminPage
+      ? "noindex,nofollow,noarchive"
+      : "index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1";
+
+    document.querySelector<HTMLLinkElement>('link[rel="canonical"]')?.setAttribute("href", canonicalUrl);
+    document.querySelectorAll<HTMLLinkElement>('link[rel="alternate"][hreflang]').forEach((link) => {
+      link.href = canonicalUrl;
+    });
+    document.querySelector<HTMLMetaElement>('meta[name="robots"]')?.setAttribute("content", robotsContent);
+    document.querySelector<HTMLMetaElement>('meta[property="og:url"]')?.setAttribute("content", canonicalUrl);
+  }, [isAdminPage, isCatalogPage]);
+
   if (isAdminPage) return <Suspense fallback={<RouteLoader />}><AdminPage /></Suspense>;
 
   return <SiteContentProvider>

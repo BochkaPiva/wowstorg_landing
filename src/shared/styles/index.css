@@ -5065,12 +5065,14 @@ html.has-open-dialog body {
 .catalog-detail {
   position: fixed;
   inset: 22px;
+  display: grid;
   width: auto;
   max-width: 1540px;
   height: calc(100dvh - 44px);
   max-height: none;
+  grid-template-columns: minmax(0, 1.08fr) minmax(420px, 0.92fr);
   margin: auto;
-  overflow: auto;
+  overflow: hidden;
   border: 1px solid rgb(255 255 255 / 0.15);
   border-radius: 8px;
   padding: 0;
@@ -5089,15 +5091,15 @@ html.has-open-dialog body {
 }
 
 .catalog-detail__close {
-  position: sticky;
-  z-index: 8;
-  top: 18px;
-  float: right;
+  position: fixed;
+  z-index: 24;
+  top: 40px;
+  right: max(40px, calc((100vw - 1540px) / 2 + 18px));
   display: grid;
   width: 44px;
   height: 44px;
   place-items: center;
-  margin: 18px 18px -62px 0;
+  margin: 0;
   border: 1px solid rgb(255 255 255 / 0.22);
   border-radius: 50%;
   background: rgb(10 10 10 / 0.86);
@@ -5107,23 +5109,109 @@ html.has-open-dialog body {
 }
 
 .catalog-detail__media {
-  position: sticky;
-  top: 0;
-  float: left;
-  width: 52%;
-  height: calc(100dvh - 46px);
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
   background: #151515;
 }
 
-.catalog-detail__media > img,
-.catalog-detail__media > .catalog-poster {
+.catalog-detail__stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  touch-action: pan-y;
+}
+
+.catalog-detail__imageButton {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border: 0;
+  padding: 0;
+  background: #151515;
+  color: #fff;
+  cursor: zoom-in;
+}
+
+.catalog-detail__imageButton > img,
+.catalog-detail__stage > .catalog-poster {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.catalog-detail__media > .catalog-poster strong {
+.catalog-detail__stage > .catalog-poster strong {
   font-size: clamp(4rem, 8vw, 8rem);
+}
+
+.catalog-detail__imageButton > span {
+  position: absolute;
+  right: 18px;
+  top: 18px;
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid rgb(255 255 255 / 0.2);
+  border-radius: 999px;
+  padding: 0 12px;
+  background: rgb(10 10 10 / 0.64);
+  font-size: 0.66rem;
+  font-weight: 700;
+  opacity: 0;
+  backdrop-filter: blur(8px);
+  transform: translateY(-4px);
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.catalog-detail__imageButton:hover > span,
+.catalog-detail__imageButton:focus-visible > span {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.catalog-detail__galleryControls {
+  position: absolute;
+  z-index: 3;
+  right: 18px;
+  bottom: 84px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  border: 1px solid rgb(255 255 255 / 0.18);
+  border-radius: 999px;
+  padding: 3px;
+  background: rgb(10 10 10 / 0.72);
+  color: #fff;
+  backdrop-filter: blur(8px);
+}
+
+.catalog-detail__galleryControls button {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.catalog-detail__galleryControls button:hover {
+  background: rgb(255 255 255 / 0.12);
+}
+
+.catalog-detail__galleryControls span {
+  min-width: 42px;
+  text-align: center;
+  font-size: 0.66rem;
+  font-weight: 700;
 }
 
 .catalog-detail__thumbs {
@@ -5162,9 +5250,14 @@ html.has-open-dialog body {
 }
 
 .catalog-detail__copy {
-  min-height: 100%;
-  margin-left: 52%;
+  min-width: 0;
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  margin-left: 0;
   padding: clamp(70px, 8vw, 126px) clamp(34px, 5vw, 80px) 70px;
+  scrollbar-color: rgb(255 255 255 / 0.22) transparent;
+  scrollbar-width: thin;
 }
 
 .catalog-detail__copy > span {
@@ -5284,6 +5377,76 @@ html.has-open-dialog body {
   border-color: rgb(255 255 255 / 0.26);
   background: transparent;
   color: #fff;
+}
+
+.catalog-lightbox {
+  position: fixed;
+  z-index: 40;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 28px 84px;
+  background: rgb(0 0 0 / 0.94);
+  animation: catalog-lightbox-in 180ms ease-out both;
+  touch-action: pan-y;
+}
+
+.catalog-lightbox figure {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  margin: 0;
+}
+
+.catalog-lightbox figure img {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100dvh - 100px);
+  object-fit: contain;
+}
+
+.catalog-lightbox figcaption {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  color: rgb(255 255 255 / 0.62);
+  font-size: 0.72rem;
+  font-weight: 700;
+  transform: translateX(-50%);
+}
+
+.catalog-lightbox__close,
+.catalog-lightbox__arrow {
+  position: fixed;
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 0.22);
+  border-radius: 50%;
+  background: rgb(18 18 18 / 0.76);
+  color: #fff;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+}
+
+.catalog-lightbox__close {
+  z-index: 2;
+  top: 22px;
+  right: 22px;
+}
+
+.catalog-lightbox__arrow {
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.catalog-lightbox__arrow--previous { left: 22px; }
+.catalog-lightbox__arrow--next { right: 22px; }
+
+@keyframes catalog-lightbox-in {
+  from { opacity: 0; }
 }
 
 .catalog-cart {
@@ -5521,6 +5684,126 @@ html.has-open-dialog body {
     min-height: 330px;
     margin: 0 -24px -38px 28%;
   }
+
+  .catalog-detail {
+    inset: 14px;
+    height: calc(100dvh - 28px);
+    grid-template-columns: minmax(0, 1fr) minmax(360px, 0.9fr);
+  }
+
+  .catalog-detail__close {
+    top: 30px;
+    right: 30px;
+  }
+}
+
+@media (max-width: 760px) {
+  .catalog-page__sectionHead {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+  }
+
+  .catalog-page__sectionHead > div,
+  .catalog-page__sectionHead p {
+    min-width: 0;
+  }
+
+  .catalog-page__sectionHead p {
+    max-width: 34rem;
+  }
+
+  .catalog-detail {
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100dvh;
+    overflow-y: auto;
+    border: 0;
+    border-radius: 0;
+    overscroll-behavior: contain;
+  }
+
+  .catalog-detail__close {
+    top: 12px;
+    right: 12px;
+  }
+
+  .catalog-detail__media {
+    width: 100%;
+    height: auto;
+    overflow: visible;
+  }
+
+  .catalog-detail__stage {
+    height: auto;
+    aspect-ratio: 4 / 3;
+  }
+
+  .catalog-detail__thumbs {
+    position: relative;
+    right: auto;
+    bottom: auto;
+    left: auto;
+    padding: 10px 14px;
+    background: #111;
+  }
+
+  .catalog-detail__thumbs button {
+    width: 72px;
+    min-width: 72px;
+    height: 54px;
+  }
+
+  .catalog-detail__galleryControls {
+    right: 12px;
+    bottom: 12px;
+  }
+
+  .catalog-detail__imageButton > span {
+    display: none;
+  }
+
+  .catalog-detail__copy {
+    height: auto;
+    min-height: auto;
+    overflow: visible;
+    padding: 36px 20px max(58px, env(safe-area-inset-bottom));
+  }
+
+  .catalog-detail__copy h2 {
+    max-width: calc(100% - 44px);
+    font-size: clamp(2.5rem, 12vw, 4.2rem);
+    line-height: 0.92;
+    overflow-wrap: break-word;
+    word-break: normal;
+  }
+
+  .catalog-detail__actions {
+    flex-direction: column;
+  }
+
+  .catalog-detail__actions button,
+  .catalog-detail__actions a {
+    width: 100%;
+  }
+
+  .catalog-lightbox {
+    padding: 64px 14px 70px;
+  }
+
+  .catalog-lightbox figure img {
+    max-height: calc(100dvh - 140px);
+  }
+
+  .catalog-lightbox__arrow {
+    top: auto;
+    bottom: 16px;
+    transform: none;
+  }
+
+  .catalog-lightbox__arrow--previous { left: 16px; }
+  .catalog-lightbox__arrow--next { right: 16px; }
 }
 
 @media (max-width: 600px) {
@@ -5561,6 +5844,21 @@ html.has-open-dialog body {
     padding: 50px 18px 70px;
   }
 
+  .catalog-page__sectionHead {
+    padding: 26px 0 24px;
+  }
+
+  .catalog-page__sectionHead h2 {
+    max-width: 100%;
+    font-size: clamp(2.75rem, 13vw, 4rem);
+    line-height: 0.94;
+    overflow-wrap: break-word;
+  }
+
+  .catalog-page__sectionHead p {
+    font-size: 0.82rem;
+  }
+
   .catalog-page__grid,
   .catalog-page__skeleton {
     grid-template-columns: 1fr;
@@ -5568,6 +5866,15 @@ html.has-open-dialog body {
 
   .catalog-card__body {
     min-height: 0;
+    padding: 20px;
+  }
+
+  .catalog-card__body > div:last-child {
+    flex-direction: column;
+  }
+
+  .catalog-card__body > div:last-child button {
+    min-height: 48px;
   }
 
   .catalog-page__toolbar {
@@ -5615,6 +5922,14 @@ html.has-open-dialog body {
 
   .brief-cartSummary a {
     grid-column: 2;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .catalog-detail__imageButton > span,
+  .catalog-lightbox {
+    animation: none;
+    transition: none;
   }
 }
 

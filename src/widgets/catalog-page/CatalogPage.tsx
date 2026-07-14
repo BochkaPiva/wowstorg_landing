@@ -1,5 +1,5 @@
-import { ArrowLeft, ArrowRight, Check, Clock3, Minus, Plus, Search, ShoppingBag, Users, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight, Clock3, Minus, Plus, Search, ShoppingBag, Users, X, ZoomIn } from "lucide-react";
+import { type TouchEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useCatalogCart } from "@features/catalog-cart/CatalogCartContext";
 import {
   type CatalogCategory,
@@ -54,25 +54,83 @@ function CartDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
 
 function ItemDialog({ item, category, onClose }: { item: CatalogItemRecord | null; category?: CatalogCategory; onClose: () => void }) {
   const dialogRef = useRef<HTMLDialogElement | null>(null);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const [activeImage, setActiveImage] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   const { addItem, items } = useCatalogCart();
 
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
-    if (item && !dialog.open) { setActiveImage(0); dialog.showModal(); }
+    if (item && !dialog.open) { setActiveImage(0); setLightboxOpen(false); dialog.showModal(); }
     if (!item && dialog.open) dialog.close();
   }, [item]);
+
+  const mediaCount = item?.media.length ?? 0;
+  const showImage = (index: number) => {
+    if (mediaCount < 1) return;
+    setActiveImage((index + mediaCount) % mediaCount);
+  };
+  const showPreviousImage = () => showImage(activeImage - 1);
+  const showNextImage = () => showImage(activeImage + 1);
+  const handleTouchStart = (event: TouchEvent<HTMLElement>) => {
+    const touch = event.touches[0];
+    touchStartRef.current = touch ? { x: touch.clientX, y: touch.clientY } : null;
+  };
+  const handleTouchEnd = (event: TouchEvent<HTMLElement>) => {
+    const start = touchStartRef.current;
+    const touch = event.changedTouches[0];
+    touchStartRef.current = null;
+    if (!start || !touch || mediaCount < 2) return;
+    const deltaX = touch.clientX - start.x;
+    const deltaY = touch.clientY - start.y;
+    if (Math.abs(deltaX) < 44 || Math.abs(deltaX) <= Math.abs(deltaY)) return;
+    if (deltaX > 0) showPreviousImage();
+    else showNextImage();
+  };
+
+  useEffect(() => {
+    if (!item) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (lightboxOpen && event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        setLightboxOpen(false);
+        return;
+      }
+      if (event.key === "ArrowLeft") showPreviousImage();
+      if (event.key === "ArrowRight") showNextImage();
+    };
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
+  }, [activeImage, item, lightboxOpen, mediaCount]);
 
   if (!item) return <dialog ref={dialogRef} />;
   const inCart = items.some((cartItem) => cartItem.id === item.id);
   const guests = formatRange(item.guestMin, item.guestMax, "гостей");
   const duration = formatRange(item.durationMin, item.durationMax, "минут");
 
-  return <dialog ref={dialogRef} className="catalog-detail" onCancel={onClose} onClose={onClose}>
+  return <dialog ref={dialogRef} className="catalog-detail" onCancel={(event) => {
+    if (lightboxOpen) {
+      event.preventDefault();
+      setLightboxOpen(false);
+      return;
+    }
+    onClose();
+  }} onClose={onClose}>
     <button className="catalog-detail__close" type="button" onClick={onClose} aria-label="Закрыть карточку"><X size={22} /></button>
     <div className="catalog-detail__media">
-      {item.media.length ? <img src={item.media[activeImage]?.src} alt={item.media[activeImage]?.alt} /> : <CatalogPoster item={item} />}
+      <div className="catalog-detail__stage" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+        {item.media.length ? <button className="catalog-detail__imageButton" type="button" onClick={() => setLightboxOpen(true)} aria-label="Увеличить фотографию">
+          <img src={item.media[activeImage]?.src} alt={item.media[activeImage]?.alt} decoding="async" />
+          <span><ZoomIn size={16} /> Увеличить</span>
+        </button> : <CatalogPoster item={item} />}
+        {item.media.length > 1 ? <div className="catalog-detail__galleryControls" aria-label="Навигация по фотографиям">
+          <button type="button" onClick={showPreviousImage} aria-label="Предыдущая фотография"><ChevronLeft size={21} /></button>
+          <span>{activeImage + 1} / {item.media.length}</span>
+          <button type="button" onClick={showNextImage} aria-label="Следующая фотография"><ChevronRight size={21} /></button>
+        </div> : null}
+      </div>
       {item.media.length > 1 ? <div className="catalog-detail__thumbs">{item.media.map((media, index) => <button className={index === activeImage ? "is-active" : ""} key={media.id} type="button" aria-label={`Показать фото ${index + 1}`} onClick={() => setActiveImage(index)}><img src={media.src} alt="" /></button>)}</div> : null}
     </div>
     <article className="catalog-detail__copy">
@@ -92,6 +150,14 @@ function ItemDialog({ item, category, onClose }: { item: CatalogItemRecord | nul
         <a href="/#brief">Обсудить задачу <ArrowRight size={18} /></a>
       </div>
     </article>
+    {lightboxOpen && item.media.length ? <div className="catalog-lightbox" role="dialog" aria-modal="true" aria-label={`Фотографии: ${item.title}`} onClick={(event) => {
+      if (event.currentTarget === event.target) setLightboxOpen(false);
+    }} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+      <button className="catalog-lightbox__close" type="button" onClick={() => setLightboxOpen(false)} aria-label="Закрыть увеличенное фото" autoFocus><X size={24} /></button>
+      {item.media.length > 1 ? <button className="catalog-lightbox__arrow catalog-lightbox__arrow--previous" type="button" onClick={showPreviousImage} aria-label="Предыдущая фотография"><ChevronLeft size={28} /></button> : null}
+      <figure><img src={item.media[activeImage]?.src} alt={item.media[activeImage]?.alt} /><figcaption>{activeImage + 1} / {item.media.length}</figcaption></figure>
+      {item.media.length > 1 ? <button className="catalog-lightbox__arrow catalog-lightbox__arrow--next" type="button" onClick={showNextImage} aria-label="Следующая фотография"><ChevronRight size={28} /></button> : null}
+    </div> : null}
   </dialog>;
 }
 
