@@ -22,6 +22,21 @@ type StoryScene = {
   action: { label: string; href: string } | null;
 };
 
+function useNativeStoryProgress() {
+  const [enabled, setEnabled] = useState(false);
+
+  useEffect(() => {
+    const query = window.matchMedia("(pointer: coarse), (max-width: 960px)");
+    const update = () => setEnabled(query.matches);
+
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+
+  return enabled;
+}
+
 function useSceneOpacity(progress: MotionValue<number>, index: number) {
   const start = index / SCENE_COUNT;
   const end = (index + 1) / SCENE_COUNT;
@@ -229,6 +244,7 @@ export function DinoStory() {
   const [mediaRequested, setMediaRequested] = useState(false);
   const [storyPlaybackActive, setStoryPlaybackActive] = useState(true);
   const reducedMotion = useReducedMotion();
+  const nativeStoryProgress = useNativeStoryProgress();
   const { scrollYProgress } = useScroll({
     target: sectionRef,
     offset: ["start start", "end end"],
@@ -239,7 +255,7 @@ export function DinoStory() {
     mass: 0.5,
     restDelta: 0.0001,
   });
-  const storyProgress = cinematicProgress;
+  const storyProgress = nativeStoryProgress ? scrollYProgress : cinematicProgress;
   const progressScale = useTransform(storyProgress, [0, 1], [0, 1]);
 
   useMotionValueEvent(storyProgress, "change", (value) => {

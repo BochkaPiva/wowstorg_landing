@@ -1246,7 +1246,11 @@ a:focus-visible {
   }
 
   .dino-story {
-    height: 700dvh;
+    height: 700svh;
+  }
+
+  .dino-story__stage {
+    height: 100svh;
   }
 
   .dino-story__scene {

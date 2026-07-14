@@ -1,7 +1,6 @@
 import { useEffect, useRef } from "react";
 
 type TurnstileApi = {
-  ready: (callback: () => void) => void;
   render: (container: HTMLElement, options: Record<string, unknown>) => string;
   remove: (widgetId: string) => void;
 };
@@ -21,13 +20,15 @@ function loadTurnstile(): Promise<TurnstileApi> {
   const pending = new Promise<TurnstileApi>((resolve, reject) => {
     const existing = document.querySelector<HTMLScriptElement>('script[data-wowstorg-turnstile="true"]');
     const script = existing ?? document.createElement("script");
-    const finish = () => window.turnstile ? window.turnstile.ready(() => resolve(window.turnstile!)) : reject(new Error("Turnstile unavailable"));
+    const finish = () => window.turnstile
+      ? resolve(window.turnstile)
+      : reject(new Error("Turnstile unavailable"));
 
     script.addEventListener("load", finish, { once: true });
     script.addEventListener("error", () => reject(new Error("Turnstile failed to load")), { once: true });
     if (!existing) {
       script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
-      script.defer = true;
+      script.async = true;
       script.dataset.wowstorgTurnstile = "true";
       document.head.appendChild(script);
     }

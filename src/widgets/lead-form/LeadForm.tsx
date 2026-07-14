@@ -36,6 +36,27 @@ const initialState: LeadFormState = {
 
 const consentVersion = "2026-07-13-v1";
 
+function formatRussianPhone(value: string) {
+  const digits = value.replace(/\D/g, "");
+  if (!digits) return "";
+
+  let normalized = digits;
+  if (normalized.startsWith("8")) {
+    normalized = `7${normalized.slice(1)}`;
+  } else if (!normalized.startsWith("7")) {
+    normalized = `7${normalized}`;
+  }
+
+  const local = normalized.slice(1, 11);
+  let formatted = "+7";
+  if (local.length > 0) formatted += ` (${local.slice(0, 3)}`;
+  if (local.length >= 3) formatted += ")";
+  if (local.length > 3) formatted += ` ${local.slice(3, 6)}`;
+  if (local.length > 6) formatted += `-${local.slice(6, 8)}`;
+  if (local.length > 8) formatted += `-${local.slice(8, 10)}`;
+  return formatted;
+}
+
 function ChoiceGroup({ name, options, value, onChange }: {
   name: string;
   options: readonly string[];
@@ -70,6 +91,7 @@ export function LeadForm() {
   const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY ?? "";
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, "") ?? "";
   const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? "";
+  const isPhoneContact = form.contactType === "Телефон";
 
   const dateComplete = form.dateMode === "flexible" || Boolean(form.dateDay && form.dateMonth && form.dateYear.length === 4);
   const firstStepComplete = Boolean(form.eventType && form.guestRange && dateComplete);
@@ -231,8 +253,29 @@ export function LeadForm() {
 
               <fieldset>
                 <legend>Куда удобнее ответить?</legend>
-                <ChoiceGroup name="contactType" options={contactTypes} value={form.contactType} onChange={(value) => update("contactType", value)} />
-                <input className="brief-contactInput" type={form.contactType === "Email" ? "email" : "text"} autoComplete={form.contactType === "Email" ? "email" : "tel"} value={form.contact} required placeholder={contactPlaceholder} aria-label={`Контакт: ${form.contactType}`} onChange={(event) => update("contact", event.target.value)} />
+                <ChoiceGroup
+                  name="contactType"
+                  options={contactTypes}
+                  value={form.contactType}
+                  onChange={(value) => {
+                    update("contactType", value);
+                    if (value === "Телефон") update("contact", formatRussianPhone(form.contact));
+                  }}
+                />
+                <input
+                  className="brief-contactInput"
+                  type={form.contactType === "Email" ? "email" : "text"}
+                  inputMode={isPhoneContact ? "tel" : undefined}
+                  autoComplete={isPhoneContact ? "tel" : form.contactType === "Email" ? "email" : "off"}
+                  value={form.contact}
+                  required
+                  maxLength={isPhoneContact ? 18 : undefined}
+                  pattern={isPhoneContact ? "\\+7 \\(\\d{3}\\) \\d{3}-\\d{2}-\\d{2}" : undefined}
+                  title={isPhoneContact ? "Введите номер полностью: +7 (900) 000-00-00" : undefined}
+                  placeholder={contactPlaceholder}
+                  aria-label={`Контакт: ${form.contactType}`}
+                  onChange={(event) => update("contact", isPhoneContact ? formatRussianPhone(event.target.value) : event.target.value)}
+                />
               </fieldset>
 
               <label className="brief-message"><span>Что ещё важно учесть?</span><textarea value={form.message} rows={2} placeholder="Площадка, задача или ориентир по бюджету — необязательно" onChange={(event) => update("message", event.target.value)} /></label>
