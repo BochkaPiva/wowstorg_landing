@@ -7,11 +7,45 @@ function prefersReducedMotion() {
 
 export function useLenis() {
   useEffect(() => {
+    let lenis: Lenis | null = null;
+    let hashFrame = 0;
+    let hashFrameAfterLayout = 0;
+
+    const scrollToHash = () => {
+      const hash = decodeURIComponent(window.location.hash.slice(1));
+      if (!hash) return;
+
+      const target = document.getElementById(hash);
+      if (!target) return;
+
+      if (lenis) {
+        lenis.scrollTo(target, { immediate: true, force: true });
+      } else {
+        target.scrollIntoView({ behavior: "auto", block: "start" });
+      }
+    };
+
+    const scheduleHashScroll = () => {
+      cancelAnimationFrame(hashFrame);
+      cancelAnimationFrame(hashFrameAfterLayout);
+      hashFrame = requestAnimationFrame(() => {
+        hashFrameAfterLayout = requestAnimationFrame(scrollToHash);
+      });
+    };
+
+    window.addEventListener("hashchange", scheduleHashScroll);
+    scheduleHashScroll();
+    void document.fonts.ready.then(scheduleHashScroll);
+
     if (prefersReducedMotion()) {
-      return undefined;
+      return () => {
+        cancelAnimationFrame(hashFrame);
+        cancelAnimationFrame(hashFrameAfterLayout);
+        window.removeEventListener("hashchange", scheduleHashScroll);
+      };
     }
 
-    const lenis = new Lenis({
+    lenis = new Lenis({
       lerp: 0.09,
       wheelMultiplier: 0.9,
       touchMultiplier: 1.1,
@@ -38,7 +72,10 @@ export function useLenis() {
 
     return () => {
       cancelAnimationFrame(frame);
+      cancelAnimationFrame(hashFrame);
+      cancelAnimationFrame(hashFrameAfterLayout);
       window.removeEventListener("wowstorg:scroll-lock", handleScrollLock);
+      window.removeEventListener("hashchange", scheduleHashScroll);
       lenis.destroy();
     };
   }, []);
