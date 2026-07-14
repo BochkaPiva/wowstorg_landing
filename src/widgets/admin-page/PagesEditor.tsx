@@ -219,9 +219,8 @@ export function PagesEditor() {
           {draft.formats.items.map((item, index) => <ItemCard key={index} title={`0${index + 1} · ${item.title}`} onRemove={() => mutate((next) => { next.formats.items.splice(index, 1); })}>
             <Field label="Название"><input value={item.title} onChange={(event) => mutate((next) => { next.formats.items[index].title = event.target.value; })} /></Field>
             <Field label="Описание"><textarea rows={2} value={item.text} onChange={(event) => mutate((next) => { next.formats.items[index].text = event.target.value; })} /></Field>
-            <Field label="Метка справа"><input value={item.note} onChange={(event) => mutate((next) => { next.formats.items[index].note = event.target.value; })} /></Field>
           </ItemCard>)}
-          <button className="admin-addButton" type="button" onClick={() => mutate((next) => { next.formats.items.push({ title: "Новый формат", text: "Описание формата", note: "метка" }); })}><Plus size={16} /> Добавить формат</button>
+          <button className="admin-addButton" type="button" onClick={() => mutate((next) => { next.formats.items.push({ title: "Новый формат", text: "Описание формата", note: "" }); })}><Plus size={16} /> Добавить формат</button>
         </div>
         <div className="admin-formSection">
           <h3>Переход в каталог</h3>

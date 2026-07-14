@@ -140,23 +140,28 @@ a:focus-visible {
 .hero__brand {
   display: inline-flex;
   width: max-content;
-  flex-direction: column;
-  gap: 3px;
+  align-items: center;
+  gap: 10px;
   font-family: Unbounded, Arial, sans-serif;
   font-weight: 700;
   line-height: 1;
+  transition: opacity 220ms var(--ease-out), transform 220ms var(--ease-out);
+}
+
+.hero__brand img {
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  object-fit: cover;
 }
 
 .hero__brand span {
   font-size: 0.78rem;
 }
 
-.hero__brand small {
-  color: rgb(255 255 255 / 0.42);
-  font-family: Onest, Arial, sans-serif;
-  font-size: 0.56rem;
-  font-weight: 700;
-  letter-spacing: 0.16em;
+.hero__brand:hover {
+  opacity: 0.76;
+  transform: translateY(-1px);
 }
 
 .hero__links {
@@ -1487,7 +1492,7 @@ a:focus-visible {
 
 .format-row {
   min-height: 118px;
-  grid-template-columns: 48px minmax(230px, 0.86fr) minmax(300px, 1.2fr) minmax(170px, 0.48fr);
+  grid-template-columns: 48px minmax(230px, 0.76fr) minmax(320px, 1.35fr);
   padding: 20px 10px;
 }
 
@@ -1499,10 +1504,6 @@ a:focus-visible {
 .format-row h3 {
   font-size: clamp(1.45rem, 2.25vw, 2.35rem);
   font-weight: 750;
-}
-
-.format-row__note {
-  max-width: 160px;
 }
 
 .format-row::before { display: none; }
@@ -2094,8 +2095,7 @@ a:focus-visible {
     grid-row: 1;
   }
 
-  .format-row p,
-  .format-row__note {
+  .format-row p {
     grid-column: 2 / -1 !important;
   }
 
@@ -3222,7 +3222,6 @@ a:focus-visible {
 
 .format-row h3,
 .format-row p,
-.format-row__note,
 .format-row__index {
   transition: color 220ms var(--ease-out);
 }

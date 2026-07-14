@@ -20,7 +20,6 @@ export function FormatIndex() {
             <span className="format-row__index">0{index + 1}</span>
             <h3>{format.title}</h3>
             <p>{format.text}</p>
-            <span className="format-row__note">{format.note}</span>
           </article>
         ))}
       </div>

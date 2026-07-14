@@ -144,7 +144,8 @@ export function Hero() {
   return (
     <section className="hero" id="top">
       <header className="hero__nav" aria-label="Главная навигация">
-        <a className="hero__brand" href="#top" aria-label={siteConfig.brandName}>
+        <a className="hero__brand" href="#top" aria-label={`Наверх — ${siteConfig.brandName}`}>
+          <img src="/favicon-32x32.png" width="30" height="30" alt="" />
           <span>{siteConfig.brandName}</span>
         </a>
         <nav className="hero__links" aria-label="Разделы сайта">
