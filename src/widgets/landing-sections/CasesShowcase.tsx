@@ -25,7 +25,7 @@ export function CasesShowcase() {
     let active = true;
     listPortfolio().then(({ collections, projects }) => {
       if (!active) return;
-      const codes: Record<string, string> = { teambuilding: "TEAM", welcome: "WELCOME", "game-zone": "PLAY" };
+      const codes: Record<string, string> = { teambuilding: "КОМАНДА", welcome: "ВСТРЕЧА", "game-zone": "ИГРА" };
       setCaseCollections(collections.map((collection) => ({
         title: collection.title,
         meta: collection.description,

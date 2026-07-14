@@ -1,7 +1,7 @@
 {
-  "name": "ВАУСТОРГ — event-агентство в Омске",
+  "name": "ВАУСТОРГ - организация мероприятий в Омске",
   "short_name": "ВАУСТОРГ",
-  "description": "Тимбилдинги, корпоративные события, игровые зоны и реквизит в Омске.",
+  "description": "Организация корпоративов, тимбилдингов и игровых зон в Омске.",
   "lang": "ru-RU",
   "start_url": "/",
   "scope": "/",
@@ -10,12 +10,12 @@
   "theme_color": "#030304",
   "icons": [
     {
-      "src": "/apple-touch-icon.png?v=4",
+      "src": "/apple-touch-icon.png?v=5",
       "sizes": "180x180",
       "type": "image/png"
     },
     {
-      "src": "/favicon-dino.png?v=4",
+      "src": "/favicon-dino.png?v=5",
       "sizes": "512x512",
       "type": "image/png"
     }

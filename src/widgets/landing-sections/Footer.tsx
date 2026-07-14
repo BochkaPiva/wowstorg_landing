@@ -8,10 +8,10 @@ export function Footer() {
   const footerHeadingBreak = Math.max(1, Math.ceil(footerHeading.length / 2));
 
   return (
-    <footer className="site-footer">
+    <footer className="site-footer" id="contacts">
       <div className="site-footer__stage">
         <div className="site-footer__closing">
-          <span>Ивент-агентство · {previewContent.contacts.city}</span>
+          <span>Организация мероприятий · {previewContent.contacts.city}</span>
           <h2>{footerHeading.slice(0, footerHeadingBreak).join(" ")}<br />{footerHeading.slice(footerHeadingBreak).join(" ")}</h2>
           <p>{previewContent.footer.description}</p>
         </div>
@@ -43,6 +43,7 @@ export function Footer() {
         <nav className="site-footer__nav" aria-label="Нижняя навигация">
           <span>На сайте</span>
           {navigationItems.map((item) => <a key={item.label} href={item.href}>{item.label}</a>)}
+          <a href="#contacts">Контакты</a>
           <a href="#brief">Оставить заявку</a>
         </nav>
       </div>

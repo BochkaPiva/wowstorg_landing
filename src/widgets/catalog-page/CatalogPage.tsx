@@ -193,8 +193,8 @@ export function CatalogPage() {
   }), [activeSection, items, query]);
 
   useEffect(() => {
-    document.title = `${active.title} — каталог ВАУСТОРГ`;
-    document.querySelector('meta[name="description"]')?.setAttribute("content", `${active.description} Каталог event-агентства ВАУСТОРГ в Омске.`);
+    document.title = `${active.title} - каталог ВАУСТОРГ`;
+    document.querySelector('meta[name="description"]')?.setAttribute("content", `${active.description} Каталог агентства мероприятий ВАУСТОРГ в Омске.`);
   }, [active]);
 
   const chooseSection = (id: CatalogCategory["id"]) => {

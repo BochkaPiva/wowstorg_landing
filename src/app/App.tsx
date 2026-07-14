@@ -30,6 +30,16 @@ function LandingPage() {
     document.title = seo.title;
     const description = document.querySelector<HTMLMetaElement>('meta[name="description"]');
     if (description) description.content = seo.description;
+    const socialMetadata = [
+      ['meta[property="og:title"]', seo.title],
+      ['meta[property="og:description"]', seo.description],
+      ['meta[name="twitter:title"]', seo.title],
+      ['meta[name="twitter:description"]', seo.description],
+    ] as const;
+    socialMetadata.forEach(([selector, value]) => {
+      const element = document.querySelector<HTMLMetaElement>(selector);
+      if (element) element.content = value;
+    });
   }, [content.seo]);
 
   return (

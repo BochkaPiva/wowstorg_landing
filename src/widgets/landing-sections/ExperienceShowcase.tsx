@@ -27,7 +27,7 @@ export function ExperienceShowcase() {
     <section className="experience-showcase" id="formats">
       <div className="experience-showcase__stage">
         <Reveal className="experience-showcase__copy">
-          <span className="chapter-kicker">Event-агентство в Омске</span>
+          <span className="chapter-kicker">Организация мероприятий в Омске</span>
           <h2>
             Мы строим не программу вечера, а игровое поле, в которое хочется зайти
             самому.
@@ -58,7 +58,7 @@ export function ExperienceShowcase() {
             <Circle size={7} />
           </motion.div>
           <div className="experience-showcase__core">
-            <span>WOW</span>
+            <span>ВАУ</span>
             <small>игра как магнит</small>
           </div>
         </div>

@@ -23,7 +23,7 @@ export const plannedLandingSections: PlannedLandingSection[] = [
     role: "attention",
     primaryQuestion: "Кто такие ВАУСТОРГ и почему здесь хочется остаться?",
     conversionJob: "Сформировать премиальный вау-эффект и мягко направить к обсуждению проекта.",
-    seoIntent: ["event агентство", "организация мероприятий", "тимбилдинг"],
+    seoIntent: ["агентство мероприятий", "организация мероприятий", "тимбилдинг"],
   },
   {
     id: "positioning",

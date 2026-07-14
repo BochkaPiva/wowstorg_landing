@@ -8,11 +8,11 @@ export const defaultLandingContentDraft: LandingContentDraft = {
   version: 3,
   updatedAt: "",
   seo: {
-    title: "ВАУСТОРГ — event-агентство и тимбилдинги в Омске",
-    description: "Корпоративы, тимбилдинги, welcome-зоны и игровой реквизит в Омске. Разрабатываем механику, комплектуем площадку и проводим событие под ключ.",
+    title: "Организация мероприятий в Омске - ВАУСТОРГ",
+    description: "Организация мероприятий в Омске: корпоративы, тимбилдинги, зоны встречи гостей, игровые станции и аренда реквизита. Сценарий и проведение.",
   },
   hero: {
-    eyebrow: "Event-агентство · Омск",
+    eyebrow: "Организация мероприятий · Омск",
     title: "События, которые",
     accent: "собирают людей.",
     description: "Корпоративы, тимбилдинги и игровые зоны в Омске. Разрабатываем механику, комплектуем площадку и проводим событие так, чтобы гости включались с первых минут.",
@@ -31,7 +31,7 @@ export const defaultLandingContentDraft: LandingContentDraft = {
     catalogCtaLabel: "Открыть каталог",
     items: [
       { title: "Тимбилдинги", text: "Цельная командная программа с общей задачей, динамикой и финалом — вместо разрозненного набора конкурсов.", note: "" },
-      { title: "Welcome-зоны", text: "Первый контакт с событием: помогает гостям освоиться, познакомиться и включиться ещё до основной программы.", note: "" },
+      { title: "Зоны встречи гостей", text: "Первый контакт с событием: помогает гостям освоиться, познакомиться и включиться ещё до основной программы.", note: "" },
       { title: "Игровые зоны", text: "Гибкий набор интерактивных станций и реквизита: от одной точки до полноценного пространства под площадку и аудиторию.", note: "" },
       { title: "События под ключ", text: "Берём на себя концепцию, сценарий, комплектацию, логистику, монтаж и проведение — вы работаете с одной командой.", note: "" },
     ],
@@ -44,7 +44,7 @@ export const defaultLandingContentDraft: LandingContentDraft = {
     ctaLabel: "Перейти в каталог",
     sections: [
       { id: "team", index: "01", tab: "Тимбилдинги", title: "Тимбилдинги", subtitle: "Готовые командные программы со сценарием и общим финалом.", description: "Раздел для цельных форматов, которые можно изучить, сравнить и добавить в подборку." },
-      { id: "welcome", index: "02", tab: "Welcome-зоны", title: "Welcome-зоны", subtitle: "Первое действие начинается раньше основной программы.", description: "Комплекты коротких механик для встречи гостей, свободного общения и мягкого включения в событие." },
+      { id: "welcome", index: "02", tab: "Зоны встречи", title: "Зоны встречи гостей", subtitle: "Первое действие начинается раньше основной программы.", description: "Комплекты коротких механик для встречи гостей, свободного общения и мягкого включения в событие." },
       { id: "spaces", index: "03", tab: "Игровые зоны", title: "Игровые зоны", subtitle: "Несколько точек работают как единая среда.", description: "Зоны для корпоративов, фестивалей и выставок: гости свободно перемещаются, а команда держит ритм." },
       { id: "props", index: "04", tab: "Реквизит", title: "Реквизит", subtitle: "Когда сценарий уже есть, остаётся собрать точный состав.", description: "Оцифрованные позиции с описанием, фотографиями, комплектацией и доступностью на выбранные даты." },
     ],
@@ -54,9 +54,9 @@ export const defaultLandingContentDraft: LandingContentDraft = {
     title: "Реализованные события.",
     description: "Выберите направление. Внутри — отдельные проекты с фотографиями, задачей, механикой и результатом.",
     collections: [
-      { title: "Тимбилдинги", meta: "Реализованные командные программы", code: "TEAM", projects: [] },
-      { title: "Welcome-зоны", meta: "Проекты для встречи и вовлечения гостей", code: "WELCOME", projects: [] },
-      { title: "Игровые зоны", meta: "Игровые пространства на событиях", code: "PLAY", projects: [] },
+      { title: "Тимбилдинги", meta: "Реализованные командные программы", code: "КОМАНДА", projects: [] },
+      { title: "Зоны встречи гостей", meta: "Проекты для встречи и вовлечения гостей", code: "ВСТРЕЧА", projects: [] },
+      { title: "Игровые зоны", meta: "Игровые пространства на событиях", code: "ИГРА", projects: [] },
     ],
   },
   story: {
@@ -83,7 +83,7 @@ export const defaultLandingContentDraft: LandingContentDraft = {
     eyebrow: "Заявка на мероприятие",
     title: "Обсудить мероприятие.",
     description: "Три факта о задаче и контакт. Вернёмся с подходящим форматом, а не общей презентацией.",
-    eventTypes: ["Тимбилдинг", "Корпоратив", "Welcome-зона", "Выставка / промо", "Аренда реквизита", "Нужна идея"],
+    eventTypes: ["Тимбилдинг", "Корпоратив", "Зона встречи гостей", "Выставка / промо", "Аренда реквизита", "Нужна идея"],
     guestRanges: ["До 30", "30–80", "80–200", "Больше 200", "Пока не знаем"],
     contactTypes: ["Телефон", "Email", "MAX"],
   },
@@ -152,14 +152,75 @@ function isDraft(value: unknown): value is LandingContentDraft {
     && Boolean(candidate.story && candidate.faq && candidate.leadForm && candidate.footer);
 }
 
+function replaceLegacy(value: string, legacy: string, replacement: string) {
+  return value === legacy ? replacement : value;
+}
+
+function replaceLegacyVariants(value: string, legacyVariants: string[], replacement: string) {
+  return legacyVariants.includes(value) ? replacement : value;
+}
+
+function migratePublicWording(draft: LandingContentDraft): LandingContentDraft {
+  const migrated = structuredClone(draft);
+
+  migrated.seo.title = replaceLegacyVariants(
+    migrated.seo.title,
+    [
+      "ВАУСТОРГ — event-агентство и тимбилдинги в Омске",
+      "Event-агентство ВАУСТОРГ в Омске — тимбилдинги и мероприятия",
+    ],
+    "Организация мероприятий в Омске - ВАУСТОРГ",
+  );
+  migrated.seo.description = replaceLegacy(
+    migrated.seo.description,
+    "Корпоративы, тимбилдинги, welcome-зоны и игровой реквизит в Омске. Разрабатываем механику, комплектуем площадку и проводим событие под ключ.",
+    "Организация мероприятий в Омске: корпоративы, тимбилдинги, зоны встречи гостей, игровые станции и аренда реквизита. Сценарий и проведение.",
+  );
+  migrated.hero.eyebrow = replaceLegacy(
+    migrated.hero.eyebrow,
+    "Event-агентство · Омск",
+    "Организация мероприятий · Омск",
+  );
+
+  migrated.formats.items = migrated.formats.items.map((item) => ({
+    ...item,
+    title: replaceLegacy(item.title, "Welcome-зоны", "Зоны встречи гостей"),
+  }));
+  migrated.catalogGateway.sections = migrated.catalogGateway.sections.map((section) => section.id === "welcome"
+    ? {
+      ...section,
+      tab: replaceLegacy(section.tab, "Welcome", "Зоны встречи"),
+      title: replaceLegacy(section.title, "Welcome-зоны", "Зоны встречи гостей"),
+    }
+    : section);
+  migrated.cases.collections = migrated.cases.collections.map((collection) => ({
+    ...collection,
+    title: replaceLegacy(collection.title, "Welcome-зоны", "Зоны встречи гостей"),
+    code: collection.code === "TEAM"
+      ? "КОМАНДА"
+      : collection.code === "WELCOME"
+        ? "ВСТРЕЧА"
+        : collection.code === "PLAY"
+          ? "ИГРА"
+          : collection.code,
+  }));
+  migrated.leadForm.eventTypes = migrated.leadForm.eventTypes.map((eventType) => replaceLegacy(
+    eventType,
+    "Welcome-зона",
+    "Зона встречи гостей",
+  ));
+
+  return migrated;
+}
+
 export function normalizeLandingContent(value: unknown): LandingContentDraft {
   if (!isDraft(value)) return cloneDefault();
   const candidate = value as LandingContentDraft & { legal?: LandingContentDraft["legal"] };
   const fallback = cloneDefault();
-  return {
+  return migratePublicWording({
     ...candidate,
     legal: candidate.legal ?? fallback.legal,
-  };
+  });
 }
 
 function migrateLegacyDraft(): LandingContentDraft | null {
