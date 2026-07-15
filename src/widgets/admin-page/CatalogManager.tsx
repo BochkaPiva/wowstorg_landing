@@ -1,4 +1,4 @@
-import { Archive, Check, ChevronRight, ImageIcon, LoaderCircle, Plus, Save, Search } from "lucide-react";
+import { Archive, Check, ChevronRight, ImageIcon, LoaderCircle, Plus, RotateCcw, Save, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useAdminAuth } from "@features/admin-auth/AdminAuthContext";
 import {
@@ -23,6 +23,7 @@ const emptyItem = (categoryId: CatalogCategory["id"] = "teambuilding"): CatalogI
   effectStatement: "",
   priceFrom: null,
   priceUnit: null,
+  stockQuantity: null,
   guestMin: null,
   guestMax: null,
   durationMin: null,
@@ -40,6 +41,19 @@ const transliterate = (value: string) => value.toLocaleLowerCase("ru")
   .replace(/[а-яё]/g, (letter) => ({ а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", ё: "e", ж: "zh", з: "z", и: "i", й: "y", к: "k", л: "l", м: "m", н: "n", о: "o", п: "p", р: "r", с: "s", т: "t", у: "u", ф: "f", х: "h", ц: "c", ч: "ch", ш: "sh", щ: "sch", ъ: "", ы: "y", ь: "", э: "e", ю: "yu", я: "ya" }[letter] ?? letter))
   .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 80);
 
+const kindLabels: Record<CatalogItemRecord["kind"], string> = {
+  package: "Программа",
+  zone: "Игровая зона",
+  service: "Услуга",
+  prop: "Реквизит",
+};
+
+const statusLabels: Record<CatalogItemRecord["status"], string> = {
+  draft: "Черновик",
+  published: "Опубликовано",
+  archived: "В архиве",
+};
+
 function TextList({ label, values, onChange }: { label: string; values: string[]; onChange: (values: string[]) => void }) {
   return <label className="admin-field"><span>{label}</span><textarea rows={3} value={values.join("\n")} onChange={(event) => onChange(event.target.value.split("\n"))} /><small>Каждый пункт с новой строки</small></label>;
 }
@@ -51,6 +65,9 @@ export function CatalogManager() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draft, setDraft] = useState<CatalogItemInput>(emptyItem());
   const [query, setQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<"all" | CatalogCategory["id"]>("all");
+  const [kindFilter, setKindFilter] = useState<"all" | CatalogItemRecord["kind"]>("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | CatalogItemRecord["status"]>("all");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -76,8 +93,16 @@ export function CatalogManager() {
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase("ru");
-    return items.filter((item) => !needle || `${item.title} ${item.slug}`.toLocaleLowerCase("ru").includes(needle));
-  }, [items, query]);
+    return items.filter((item) => {
+      const searchable = `${item.title} ${item.slug} ${item.shortDescription} ${item.badges.join(" ")}`.toLocaleLowerCase("ru");
+      return (!needle || searchable.includes(needle))
+        && (categoryFilter === "all" || item.categoryId === categoryFilter)
+        && (kindFilter === "all" || item.kind === kindFilter)
+        && (statusFilter === "all" || item.status === statusFilter);
+    });
+  }, [categoryFilter, items, kindFilter, query, statusFilter]);
+
+  const hasFilters = Boolean(query.trim()) || categoryFilter !== "all" || kindFilter !== "all" || statusFilter !== "all";
 
   const select = (item: CatalogItemRecord) => {
     setSelectedId(item.id);
@@ -88,6 +113,59 @@ export function CatalogManager() {
   };
   const create = () => { setSelectedId(null); setDraft(emptyItem(categories[0]?.id)); setMessage(null); setError(null); };
   const update = <K extends keyof CatalogItemInput>(key: K, value: CatalogItemInput[K]) => setDraft((current) => ({ ...current, [key]: value }));
+  const changeCategory = (categoryId: CatalogCategory["id"]) => setDraft((current) => {
+    if (categoryId === "props") {
+      return { ...current, categoryId, kind: "prop", leadIntent: "rent", priceUnit: current.kind === "prop" ? current.priceUnit : "за штуку / сутки" };
+    }
+    if (current.kind === "prop") {
+      return {
+        ...current,
+        categoryId,
+        kind: categoryId === "teambuilding" ? "package" : "zone",
+        leadIntent: "selection",
+        stockQuantity: null,
+      };
+    }
+    return { ...current, categoryId };
+  });
+  const changeKind = (kind: CatalogItemRecord["kind"]) => setDraft((current) => {
+    if (kind === "prop") {
+      return { ...current, kind, categoryId: "props", leadIntent: "rent", priceUnit: current.priceUnit || "за штуку / сутки" };
+    }
+    const categoryId = current.categoryId === "props"
+      ? kind === "package" ? "teambuilding" : kind === "zone" ? "game_zone" : "welcome"
+      : current.categoryId;
+    return {
+      ...current,
+      kind,
+      categoryId,
+      leadIntent: current.leadIntent === "rent" ? "selection" : current.leadIntent,
+      stockQuantity: null,
+    };
+  });
+
+  const isProp = draft.kind === "prop";
+  const supportsGuests = draft.kind === "package" || draft.kind === "zone";
+  const supportsDuration = !isProp;
+  const editorProfile = isProp
+    ? {
+        title: "Карточка реквизита",
+        description: "Укажите единичную цену и доступное количество. Параметры гостей и длительности здесь не используются.",
+      }
+    : draft.kind === "package"
+      ? {
+          title: "Готовая программа",
+          description: "Для программы можно указать подходящий диапазон гостей, длительность и состав предложения.",
+        }
+      : draft.kind === "zone"
+        ? {
+            title: "Игровая зона",
+            description: "Укажите масштаб аудитории, время работы, состав станции и требования к площадке.",
+          }
+        : {
+            title: "Услуга",
+            description: "Опишите результат услуги и длительность, если она заранее определена.",
+          };
 
   const save = async () => {
     if (!user || !canEdit) return;
@@ -106,10 +184,18 @@ export function CatalogManager() {
     }
     setSaving(true); setError(null); setMessage(null);
     try {
+      const normalizedIsProp = draft.kind === "prop";
+      const normalizedSupportsGuests = draft.kind === "package" || draft.kind === "zone";
       const normalized = {
         ...draft,
         slug,
-        includedItems: draft.includedItems.map((item) => item.trim()).filter(Boolean),
+        effectStatement: normalizedIsProp ? "" : draft.effectStatement.trim(),
+        stockQuantity: normalizedIsProp ? draft.stockQuantity : null,
+        guestMin: normalizedSupportsGuests ? draft.guestMin : null,
+        guestMax: normalizedSupportsGuests ? draft.guestMax : null,
+        durationMin: normalizedIsProp ? null : draft.durationMin,
+        durationMax: normalizedIsProp ? null : draft.durationMax,
+        includedItems: normalizedIsProp ? [] : draft.includedItems.map((item) => item.trim()).filter(Boolean),
         requirements: draft.requirements.map((item) => item.trim()).filter(Boolean),
         badges: draft.badges.map((item) => item.trim()).filter(Boolean),
       };
@@ -131,10 +217,48 @@ export function CatalogManager() {
 
   return <div className="admin-manager">
     <aside className="admin-manager__list">
-      <div className="admin-manager__tools"><label><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Поиск по каталогу" /></label><button type="button" onClick={create}><Plus size={17} /> Новая карточка</button></div>
+      <div className="admin-manager__tools">
+        <label className="admin-manager__search">
+          <Search size={17} />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Название, описание или метка" />
+        </label>
+        <div className="admin-manager__filters">
+          <label className="is-wide">
+            <span>Раздел</span>
+            <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value as typeof categoryFilter)}>
+              <option value="all">Все разделы</option>
+              {categories.map((category) => <option key={category.id} value={category.id}>{category.title}</option>)}
+            </select>
+          </label>
+          <label>
+            <span>Тип</span>
+            <select value={kindFilter} onChange={(event) => setKindFilter(event.target.value as typeof kindFilter)}>
+              <option value="all">Все типы</option>
+              <option value="package">Программы</option>
+              <option value="zone">Игровые зоны</option>
+              <option value="service">Услуги</option>
+              <option value="prop">Реквизит</option>
+            </select>
+          </label>
+          <label>
+            <span>Статус</span>
+            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)}>
+              <option value="all">Все статусы</option>
+              <option value="published">Опубликовано</option>
+              <option value="draft">Черновики</option>
+              <option value="archived">В архиве</option>
+            </select>
+          </label>
+        </div>
+        <div className="admin-manager__filterMeta">
+          <span>{filtered.length} из {items.length}</span>
+          {hasFilters ? <button type="button" onClick={() => { setQuery(""); setCategoryFilter("all"); setKindFilter("all"); setStatusFilter("all"); }}><RotateCcw size={13} /> Сбросить</button> : null}
+        </div>
+        <button className="admin-manager__new" type="button" onClick={create}><Plus size={17} /> Новая карточка</button>
+      </div>
       {loading ? <div className="admin-listState"><LoaderCircle className="is-spinning" size={22} /> Загружаем позиции</div> : null}
-      {!loading && !filtered.length ? <div className="admin-listState"><strong>Нет позиций</strong><span>Создайте первую карточку каталога.</span></div> : null}
-      <div className="admin-manager__rows">{filtered.map((item) => <button className={selectedId === item.id ? "is-active" : ""} type="button" key={item.id} onClick={() => select(item)}><div className="admin-rowThumb">{item.media[0] ? <img src={item.media[0].src} alt="" /> : <ImageIcon size={18} />}</div><span><strong>{item.title}</strong><small>{categories.find((category) => category.id === item.categoryId)?.title} · {item.status === "published" ? "Опубликовано" : item.status === "draft" ? "Черновик" : "В архиве"}</small></span><ChevronRight size={17} /></button>)}</div>
+      {!loading && !filtered.length ? <div className="admin-listState"><strong>{hasFilters ? "Ничего не найдено" : "Нет позиций"}</strong><span>{hasFilters ? "Измените запрос или сбросьте фильтры." : "Создайте первую карточку каталога."}</span></div> : null}
+      <div className="admin-manager__rows">{filtered.map((item) => <button className={selectedId === item.id ? "is-active" : ""} type="button" key={item.id} onClick={() => select(item)}><div className="admin-rowThumb">{item.media[0] ? <img src={item.media[0].src} alt="" /> : <ImageIcon size={18} />}</div><span><strong>{item.title}</strong><small>{categories.find((category) => category.id === item.categoryId)?.title} · {statusLabels[item.status]}</small></span><ChevronRight size={17} /></button>)}</div>
     </aside>
 
     <section className="admin-manager__editor">
@@ -143,20 +267,20 @@ export function CatalogManager() {
       <div className="admin-editorGrid">
         <label className="admin-field"><span>Название</span><input value={draft.title} onChange={(event) => update("title", event.target.value)} /></label>
         <label className="admin-field"><span>Адрес карточки</span><input value={draft.slug} placeholder="Заполнится автоматически" onChange={(event) => update("slug", transliterate(event.target.value))} /></label>
-        <label className="admin-field"><span>Раздел</span><select value={draft.categoryId} onChange={(event) => update("categoryId", event.target.value as CatalogCategory["id"])}>{categories.map((category) => <option key={category.id} value={category.id}>{category.title}</option>)}</select></label>
-        <label className="admin-field"><span>Тип</span><select value={draft.kind} onChange={(event) => update("kind", event.target.value as CatalogItemInput["kind"])}><option value="package">Пакет</option><option value="zone">Зона</option><option value="service">Услуга</option><option value="prop">Реквизит</option></select></label>
-        <label className="admin-field"><span>Цена от</span><input type="number" min="0" step="100" value={draft.priceFrom ?? ""} placeholder="Не указывать" onChange={(event) => update("priceFrom", event.target.value ? Number(event.target.value) : null)} /></label>
-        <label className="admin-field"><span>Единица цены</span><input value={draft.priceUnit ?? ""} placeholder="за программу / в сутки" onChange={(event) => update("priceUnit", event.target.value || null)} /></label>
+        <label className="admin-field"><span>Раздел</span><select value={draft.categoryId} onChange={(event) => changeCategory(event.target.value as CatalogCategory["id"])}>{categories.map((category) => <option key={category.id} value={category.id}>{category.title}</option>)}</select></label>
+        <label className="admin-field"><span>Тип</span><select value={draft.kind} onChange={(event) => changeKind(event.target.value as CatalogItemInput["kind"])}>{Object.entries(kindLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+        <div className="admin-typeNote admin-field--wide"><strong>{editorProfile.title}</strong><span>{editorProfile.description}</span></div>
+        <label className="admin-field"><span>{isProp ? "Цена за единицу" : "Цена от"}</span><input type="number" min="0" step={isProp ? 1 : 100} value={draft.priceFrom ?? ""} placeholder="Не указывать" onChange={(event) => update("priceFrom", event.target.value ? Number(event.target.value) : null)} /></label>
+        <label className="admin-field"><span>Единица цены</span><input value={draft.priceUnit ?? ""} placeholder={isProp ? "за штуку / в сутки" : "за программу / в сутки"} onChange={(event) => update("priceUnit", event.target.value || null)} /></label>
+        {isProp ? <label className="admin-field"><span>Количество в наличии</span><input type="number" min="0" step="1" value={draft.stockQuantity ?? ""} placeholder="Не отслеживать" onChange={(event) => update("stockQuantity", event.target.value === "" ? null : Number(event.target.value))} /><small>Оставьте пустым, если остаток не ведётся.</small></label> : null}
         <label className="admin-field"><span>Действие в заявке</span><select value={draft.leadIntent} onChange={(event) => update("leadIntent", event.target.value as CatalogItemInput["leadIntent"])}><option value="selection">Добавить в подборку</option><option value="estimate">Запросить расчёт</option><option value="rent">Запросить аренду</option><option value="consultation">Обсудить с менеджером</option></select></label>
         <label className="admin-field admin-field--wide"><span>Короткое описание</span><textarea rows={3} maxLength={320} value={draft.shortDescription} onChange={(event) => update("shortDescription", event.target.value)} /></label>
         <label className="admin-field admin-field--wide"><span>Полное описание</span><textarea rows={6} maxLength={8000} value={draft.description} onChange={(event) => update("description", event.target.value)} /></label>
-        <label className="admin-field admin-field--wide"><span>Главный эффект</span><textarea rows={2} maxLength={500} value={draft.effectStatement} onChange={(event) => update("effectStatement", event.target.value)} /></label>
-        <label className="admin-field"><span>Гостей от</span><input type="number" min="1" value={draft.guestMin ?? ""} onChange={(event) => update("guestMin", event.target.value ? Number(event.target.value) : null)} /></label>
-        <label className="admin-field"><span>Гостей до</span><input type="number" min="1" value={draft.guestMax ?? ""} onChange={(event) => update("guestMax", event.target.value ? Number(event.target.value) : null)} /></label>
-        <label className="admin-field"><span>Минут от</span><input type="number" min="1" value={draft.durationMin ?? ""} onChange={(event) => update("durationMin", event.target.value ? Number(event.target.value) : null)} /></label>
-        <label className="admin-field"><span>Минут до</span><input type="number" min="1" value={draft.durationMax ?? ""} onChange={(event) => update("durationMax", event.target.value ? Number(event.target.value) : null)} /></label>
-        <TextList label="В составе" values={draft.includedItems} onChange={(value) => update("includedItems", value)} />
-        <TextList label="Требования" values={draft.requirements} onChange={(value) => update("requirements", value)} />
+        {!isProp ? <label className="admin-field admin-field--wide"><span>Главный эффект</span><textarea rows={2} maxLength={500} value={draft.effectStatement} onChange={(event) => update("effectStatement", event.target.value)} /></label> : null}
+        {supportsGuests ? <><label className="admin-field"><span>Гостей от</span><input type="number" min="1" value={draft.guestMin ?? ""} onChange={(event) => update("guestMin", event.target.value ? Number(event.target.value) : null)} /></label><label className="admin-field"><span>Гостей до</span><input type="number" min="1" value={draft.guestMax ?? ""} onChange={(event) => update("guestMax", event.target.value ? Number(event.target.value) : null)} /></label></> : null}
+        {supportsDuration ? <><label className="admin-field"><span>Минут от</span><input type="number" min="1" value={draft.durationMin ?? ""} onChange={(event) => update("durationMin", event.target.value ? Number(event.target.value) : null)} /></label><label className="admin-field"><span>Минут до</span><input type="number" min="1" value={draft.durationMax ?? ""} onChange={(event) => update("durationMax", event.target.value ? Number(event.target.value) : null)} /></label></> : null}
+        {!isProp ? <TextList label="В составе" values={draft.includedItems} onChange={(value) => update("includedItems", value)} /> : null}
+        <TextList label={isProp ? "Условия аренды" : "Требования"} values={draft.requirements} onChange={(value) => update("requirements", value)} />
         <TextList label="Метки" values={draft.badges} onChange={(value) => update("badges", value)} />
         <label className="admin-field"><span>Порядок</span><input type="number" value={draft.sortOrder} onChange={(event) => update("sortOrder", Number(event.target.value))} /></label>
         <label className="admin-checkField"><input type="checkbox" checked={draft.isFeatured} onChange={(event) => update("isFeatured", event.target.checked)} /><span>Показывать выше остальных</span></label>

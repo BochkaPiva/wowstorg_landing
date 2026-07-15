@@ -27,6 +27,7 @@ export type CatalogItemRecord = {
   effectStatement: string;
   priceFrom: number | null;
   priceUnit: string | null;
+  stockQuantity: number | null;
   guestMin: number | null;
   guestMax: number | null;
   durationMin: number | null;
@@ -53,6 +54,7 @@ type CatalogItemRow = {
   effect_statement: string;
   price_from: number | string | null;
   price_unit: string | null;
+  stock_quantity: number | null;
   guest_min: number | null;
   guest_max: number | null;
   duration_min: number | null;
@@ -80,6 +82,7 @@ function mapItem(row: CatalogItemRow): CatalogItemRecord {
     effectStatement: row.effect_statement,
     priceFrom: row.price_from === null ? null : Number(row.price_from),
     priceUnit: row.price_unit,
+    stockQuantity: row.stock_quantity,
     guestMin: row.guest_min,
     guestMax: row.guest_max,
     durationMin: row.duration_min,
@@ -139,6 +142,7 @@ function toPayload(input: CatalogItemInput, userId: string) {
     effect_statement: input.effectStatement.trim(),
     price_from: input.priceFrom,
     price_unit: input.priceUnit || null,
+    stock_quantity: input.stockQuantity,
     guest_min: input.guestMin,
     guest_max: input.guestMax,
     duration_min: input.durationMin,

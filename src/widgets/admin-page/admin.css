@@ -1169,7 +1169,7 @@
   padding: 16px;
 }
 
-.admin-manager__tools label {
+.admin-manager__search {
   display: flex;
   min-height: 42px;
   align-items: center;
@@ -1181,13 +1181,82 @@
   color: #777974;
 }
 
-.admin-manager__tools input {
+.admin-manager__search input {
   width: 100%;
   border: 0;
   outline: 0;
   background: transparent;
   color: #171717;
   font-size: 0.75rem;
+}
+
+.admin-manager__filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.admin-manager__filters label {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.admin-manager__filters label.is-wide {
+  grid-column: 1 / -1;
+}
+
+.admin-manager__filters label > span {
+  color: var(--admin-muted);
+  font-size: 0.58rem;
+  font-weight: 700;
+}
+
+.admin-manager__filters select {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  border: 1px solid #d1d2cd;
+  border-radius: 5px;
+  padding: 0 9px;
+  background: #fff;
+  color: #333;
+  font-size: 0.68rem;
+}
+
+.admin-manager__filterMeta {
+  display: flex;
+  min-height: 26px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--admin-muted);
+}
+
+.admin-manager__filterMeta > span {
+  font-size: 0.61rem;
+  font-weight: 650;
+}
+
+.admin-manager__filterMeta button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  padding: 4px 0;
+  background: transparent;
+  color: #4d4f4a;
+  cursor: pointer;
+  font-size: 0.61rem;
+  font-weight: 650;
+}
+
+.admin-manager__filterMeta button:hover {
+  color: #111;
+}
+
+.admin-manager__new {
+  width: 100%;
 }
 
 .admin-manager__tools > button,
@@ -1330,6 +1399,24 @@
 
 .admin-field--wide {
   grid-column: 1 / -1;
+}
+
+.admin-typeNote {
+  display: grid;
+  gap: 4px;
+  border-left: 3px solid var(--admin-accent);
+  padding: 10px 12px;
+  background: #fafaf8;
+}
+
+.admin-typeNote strong {
+  font-size: 0.72rem;
+}
+
+.admin-typeNote span {
+  color: var(--admin-muted);
+  font-size: 0.66rem;
+  line-height: 1.5;
 }
 
 .admin-checkField {
@@ -1764,6 +1851,21 @@
   to { rotate: 1turn; }
 }
 
+@media (min-width: 981px) {
+  .admin-sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 20;
+    width: 248px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .admin-workspace {
+    grid-column: 2;
+  }
+}
+
 @media (max-width: 980px) {
   .admin-shell {
     grid-template-columns: minmax(0, 1fr);
@@ -1890,6 +1992,14 @@
 
   .admin-manager {
     min-height: 0;
+  }
+
+  .admin-manager__filters {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-manager__filters label.is-wide {
+    grid-column: auto;
   }
 
   .admin-manager__list {
