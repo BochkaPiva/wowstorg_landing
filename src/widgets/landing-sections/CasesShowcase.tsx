@@ -1,7 +1,7 @@
 import { ArrowLeft, ArrowUpRight, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useSiteContent } from "@features/site-content/SiteContentContext";
-import { listPortfolio } from "@features/portfolio-data/portfolioRepository";
+import { listPublicPortfolio } from "@features/portfolio-data/publicPortfolioRepository";
 import type { PortfolioCollection } from "@entities/admin/model";
 
 export function CasesShowcase() {
@@ -23,7 +23,7 @@ export function CasesShowcase() {
       return;
     }
     let active = true;
-    listPortfolio().then(({ collections, projects }) => {
+    listPublicPortfolio().then(({ collections, projects }) => {
       if (!active) return;
       const codes: Record<string, string> = { teambuilding: "КОМАНДА", welcome: "ВСТРЕЧА", "game-zone": "ИГРА" };
       setCaseCollections(collections.map((collection) => ({

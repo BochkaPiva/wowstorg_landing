@@ -38,13 +38,13 @@ function useNativeStoryProgress() {
   return enabled;
 }
 
-function useStoryVideoSources(enabled: boolean, useDirectSources: boolean) {
+function useStoryVideoSources(enabled: boolean, useDirectSources: boolean, activeIndex: number) {
   const [sources, setSources] = useState<Array<string | undefined>>(() => Array(SCENE_COUNT).fill(undefined));
 
   useEffect(() => {
     if (!enabled) return undefined;
     if (useDirectSources) {
-      setSources(VIDEO_SOURCES);
+      setSources((current) => current.map((source, index) => source ?? (index <= activeIndex + 1 ? VIDEO_SOURCES[index] : undefined)));
       return undefined;
     }
 
@@ -81,7 +81,7 @@ function useStoryVideoSources(enabled: boolean, useDirectSources: boolean) {
       controller.abort();
       objectUrls.forEach((url) => URL.revokeObjectURL(url));
     };
-  }, [enabled, useDirectSources]);
+  }, [activeIndex, enabled, useDirectSources]);
 
   return sources;
 }
@@ -230,10 +230,12 @@ function StoryVideo({
       <img
         className="dino-story__poster"
         src={`/dino/${index + 1}-poster.webp`}
+        srcSet={`/dino/${index + 1}-poster-640.webp 640w, /dino/${index + 1}-poster.webp 1280w`}
+        sizes="100vw"
         alt=""
         width="1280"
         height="720"
-        loading="eager"
+        loading="lazy"
         decoding="async"
       />
       <video
@@ -296,7 +298,7 @@ export function DinoStory() {
   const [storyPlaybackActive, setStoryPlaybackActive] = useState(true);
   const reducedMotion = useReducedMotion();
   const nativeStoryProgress = useNativeStoryProgress();
-  const videoSources = useStoryVideoSources(mediaRequested, nativeStoryProgress);
+  const videoSources = useStoryVideoSources(mediaRequested, nativeStoryProgress, activeScene);
   const { scrollYProgress } = useScroll({
     target: sectionRef,
     offset: ["start start", "end end"],
@@ -332,7 +334,7 @@ export function DinoStory() {
           observer.disconnect();
         }
       },
-      { rootMargin: "4000px 0px" },
+      { rootMargin: "800px 0px" },
     );
 
     observer.observe(section);

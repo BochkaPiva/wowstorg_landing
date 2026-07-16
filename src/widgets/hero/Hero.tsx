@@ -17,12 +17,25 @@ export function Hero() {
   const smoothTime = useRef(0);
   const durationRef = useRef(0);
   const frameRef = useRef(0);
+  const [shouldLoadVideo, setShouldLoadVideo] = useState(() => !window.matchMedia("(pointer: coarse), (max-width: 760px)").matches);
   const [resolvedVideoSrc, setResolvedVideoSrc] = useState<string | null>(null);
   const [videoReady, setVideoReady] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const prefersReducedMotion = useReducedMotion();
 
   useEffect(() => {
+    if (shouldLoadVideo) return undefined;
+    const requestVideo = () => setShouldLoadVideo(true);
+    window.addEventListener("pointerdown", requestVideo, { once: true, passive: true });
+    window.addEventListener("touchstart", requestVideo, { once: true, passive: true });
+    return () => {
+      window.removeEventListener("pointerdown", requestVideo);
+      window.removeEventListener("touchstart", requestVideo);
+    };
+  }, [shouldLoadVideo]);
+
+  useEffect(() => {
+    if (!shouldLoadVideo) return undefined;
     const controller = new AbortController();
     let objectUrl: string | null = null;
     let active = true;
@@ -57,7 +70,7 @@ export function Hero() {
       controller.abort();
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [videoSrc]);
+  }, [shouldLoadVideo, videoSrc]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -111,7 +124,7 @@ export function Hero() {
 
   useEffect(() => {
     const video = videoRef.current;
-    if (!video) return undefined;
+    if (!video || !resolvedVideoSrc) return undefined;
 
     let lastSeekAt = 0;
     const seekInterval = 1000 / 30;
@@ -139,7 +152,7 @@ export function Hero() {
     return () => {
       cancelAnimationFrame(frameRef.current);
     };
-  }, []);
+  }, [resolvedVideoSrc]);
 
   return (
     <section className="hero" id="top">
@@ -175,6 +188,8 @@ export function Hero() {
         <img
           className={`hero__poster ${videoReady ? "hero__poster--hidden" : ""}`}
           src="/hero-poster.webp"
+          srcSet="/hero-poster-768.webp 768w, /hero-poster.webp 1280w"
+          sizes="(max-width: 960px) 170vw, 100vw"
           width="1280"
           height="720"
           alt=""
@@ -184,7 +199,7 @@ export function Hero() {
           ref={videoRef}
           className={`hero__video ${videoReady ? "hero__video--ready" : ""}`}
           src={resolvedVideoSrc ?? undefined}
-          preload="auto"
+          preload={shouldLoadVideo ? "auto" : "none"}
           muted
           playsInline
           disablePictureInPicture

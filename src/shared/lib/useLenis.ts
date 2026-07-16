@@ -1,17 +1,20 @@
 import { useEffect } from "react";
-import Lenis from "lenis";
+
+type LenisInstance = import("lenis").default;
 
 function prefersReducedMotion() {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
 function prefersNativeTouchScroll() {
-  return window.matchMedia("(pointer: coarse)").matches;
+  return window.matchMedia("(pointer: coarse), (max-width: 760px)").matches;
 }
 
 export function useLenis() {
   useEffect(() => {
-    let lenis: Lenis | null = null;
+    let lenis: LenisInstance | null = null;
+    let cancelled = false;
+    let frame = 0;
     let hashFrame = 0;
     let hashFrameAfterLayout = 0;
 
@@ -49,38 +52,39 @@ export function useLenis() {
       };
     }
 
-    lenis = new Lenis({
-      lerp: 0.09,
-      wheelMultiplier: 0.9,
-      touchMultiplier: 1.1,
-    });
-
     const handleScrollLock = (event: Event) => {
       const isLocked = (event as CustomEvent<boolean>).detail;
       if (isLocked) {
-        lenis.stop();
+        lenis?.stop();
       } else {
-        lenis.start();
+        lenis?.start();
       }
     };
 
-    window.addEventListener("wowstorg:scroll-lock", handleScrollLock);
-
-    let frame = 0;
-    const raf = (time: number) => {
-      lenis.raf(time);
+    void import("lenis").then(({ default: Lenis }) => {
+      if (cancelled) return;
+      lenis = new Lenis({
+        lerp: 0.09,
+        wheelMultiplier: 0.9,
+        touchMultiplier: 1.1,
+      });
+      window.addEventListener("wowstorg:scroll-lock", handleScrollLock);
+      const raf = (time: number) => {
+        lenis?.raf(time);
+        frame = requestAnimationFrame(raf);
+      };
       frame = requestAnimationFrame(raf);
-    };
-
-    frame = requestAnimationFrame(raf);
+      scheduleHashScroll();
+    });
 
     return () => {
+      cancelled = true;
       cancelAnimationFrame(frame);
       cancelAnimationFrame(hashFrame);
       cancelAnimationFrame(hashFrameAfterLayout);
       window.removeEventListener("wowstorg:scroll-lock", handleScrollLock);
       window.removeEventListener("hashchange", scheduleHashScroll);
-      lenis.destroy();
+      lenis?.destroy();
     };
   }, []);
 }

@@ -18,6 +18,8 @@ export function Footer() {
         <div className="site-footer__visual" aria-hidden="true">
           <img
             src="/footer-dino.webp"
+            srcSet="/footer-dino-480.webp 480w, /footer-dino-800.webp 800w, /footer-dino.webp 1400w"
+            sizes="(max-width: 720px) 100vw, 55vw"
             alt=""
             width="1400"
             height="788"
