@@ -325,6 +325,23 @@ export async function uploadCatalogImage(itemId: string, file: File, alt: string
   } satisfies CatalogMediaRecord;
 }
 
+export async function uploadCatalogImages(
+  itemId: string,
+  files: Array<{ file: File; alt: string }>,
+  startSortOrder = 0,
+) {
+  const uploaded: CatalogMediaRecord[] = [];
+  try {
+    for (const [index, entry] of files.entries()) {
+      uploaded.push(await uploadCatalogImage(itemId, entry.file, entry.alt, startSortOrder + index));
+    }
+    return uploaded;
+  } catch (cause) {
+    await Promise.allSettled(uploaded.map((media) => deleteCatalogImage(media)));
+    throw cause;
+  }
+}
+
 export async function deleteCatalogImage(media: CatalogMediaRecord) {
   const client = requireSupabase();
   const { error } = await client.from("catalog_media").delete().eq("id", media.id);

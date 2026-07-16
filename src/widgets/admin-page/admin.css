@@ -1909,6 +1909,25 @@
   cursor: default;
 }
 
+.admin-uploader__pending {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  border-radius: 5px;
+  padding: 0 11px;
+  background: #ecece8;
+  color: #696b66;
+  font-size: 0.64rem;
+  font-weight: 700;
+}
+
+.admin-uploader__pending.is-ready {
+  background: #171717;
+  color: #fff;
+}
+
 .admin-mediaGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2085,6 +2104,104 @@
   font-size: 0.7rem;
 }
 
+.admin-leads > header button.is-secondary {
+  border-color: #cacbc6;
+  background: #fff;
+  color: #333;
+}
+
+.admin-leadToolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(230px, 0.34fr) auto;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--admin-line);
+  padding: 14px 22px;
+  background: #fafaf8;
+}
+
+.admin-leadViews {
+  display: flex;
+  min-width: 0;
+  gap: 5px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.admin-leadViews::-webkit-scrollbar {
+  display: none;
+}
+
+.admin-leadViews button,
+.admin-leadExport {
+  display: inline-flex;
+  min-width: max-content;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid #d0d1cc;
+  border-radius: 5px;
+  padding: 0 11px;
+  background: #fff;
+  color: #4f514c;
+  cursor: pointer;
+  font-size: 0.66rem;
+  font-weight: 700;
+}
+
+.admin-leadViews button strong {
+  display: grid;
+  min-width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 50%;
+  background: #ecece8;
+  color: #555752;
+  font-size: 0.6rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-leadViews button.is-active {
+  border-color: #171717;
+  background: #171717;
+  color: #fff;
+}
+
+.admin-leadViews button.is-active strong {
+  background: var(--admin-accent);
+  color: #171717;
+}
+
+.admin-leadSearch {
+  display: flex;
+  min-width: 0;
+  min-height: 40px;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #d0d1cc;
+  border-radius: 5px;
+  padding: 0 10px;
+  background: #fff;
+  color: #777974;
+}
+
+.admin-leadSearch input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #242522;
+  font-size: 0.68rem;
+}
+
+.admin-leadExport:disabled,
+.admin-leads > header button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 .admin-leadList {
   display: grid;
 }
@@ -2092,6 +2209,14 @@
 .admin-leadList article {
   border-bottom: 1px solid var(--admin-line);
   padding: 22px;
+}
+
+.admin-leadList article.is-new {
+  background: #fffdf4;
+}
+
+.admin-leadList article.is-archived {
+  background: #fafaf8;
 }
 
 .admin-leadList article:last-child {
@@ -2105,9 +2230,45 @@
   gap: 24px;
 }
 
-.admin-leadList article > header span {
+.admin-leadHeading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px 10px;
+}
+
+.admin-leadHeading time {
   color: var(--admin-muted);
   font-size: 0.62rem;
+}
+
+.admin-leadStatus {
+  display: inline-flex;
+  min-height: 24px;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0 8px;
+  background: #ecece8;
+  color: #555752;
+  font-size: 0.58rem;
+  font-weight: 750;
+}
+
+.admin-leadStatus--new {
+  background: var(--admin-accent);
+  color: #171717;
+}
+
+.admin-leadStatus--contacted,
+.admin-leadStatus--qualified {
+  background: #e5eee5;
+  color: #315436;
+}
+
+.admin-leadStatus--rejected,
+.admin-leadStatus--converted {
+  background: #e7e7e3;
+  color: #666862;
 }
 
 .admin-leadList h3 {
@@ -2122,12 +2283,24 @@
   margin-top: 17px;
 }
 
-.admin-leadFacts span {
+.admin-leadFacts span,
+.admin-leadFacts a {
   display: inline-flex;
   align-items: center;
   gap: 7px;
   color: #555752;
   font-size: 0.68rem;
+}
+
+.admin-leadFacts a {
+  color: #242522;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.admin-leadFacts a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .admin-leadList dl {
@@ -2359,6 +2532,21 @@
 
   .admin-content {
     padding: 18px;
+  }
+
+  .admin-leadToolbar {
+    grid-template-columns: 1fr;
+    padding-inline: 16px;
+  }
+
+  .admin-leadViews {
+    margin-inline: -16px;
+    padding-inline: 16px;
+  }
+
+  .admin-leadSearch,
+  .admin-leadExport {
+    width: 100%;
   }
 
   .admin-metrics,

@@ -13,6 +13,7 @@ import {
   type CatalogItemRecord,
   type CatalogPropGroup,
   uploadCatalogImage,
+  uploadCatalogImages,
   uploadCatalogPresentation,
 } from "@features/catalog-data/catalogRepository";
 import { MediaUploader } from "./MediaUploader";
@@ -97,6 +98,8 @@ export function CatalogManager() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingPresentation, setUploadingPresentation] = useState(false);
+  const [pendingImages, setPendingImages] = useState<{ files: File[]; alt: string }>({ files: [], alt: "" });
+  const [mediaResetToken, setMediaResetToken] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -139,7 +142,13 @@ export function CatalogManager() {
 
   const hasFilters = Boolean(query.trim()) || categoryFilter !== "all" || propGroupFilter !== "all" || kindFilter !== "all" || statusFilter !== "all";
 
+  const resetPendingImages = () => {
+    setPendingImages({ files: [], alt: "" });
+    setMediaResetToken((current) => current + 1);
+  };
+
   const select = (item: CatalogItemRecord) => {
+    resetPendingImages();
     setSelectedId(item.id);
     const { id: _id, updatedAt: _updatedAt, media: _media, presentationUrl: _presentationUrl, ...input } = item;
     setDraft(input);
@@ -147,6 +156,7 @@ export function CatalogManager() {
     setError(null);
   };
   const create = () => {
+    resetPendingImages();
     const categoryId = categoryFilter === "all" ? categories[0]?.id : categoryFilter;
     const next = emptyItem(categoryId);
     if (categoryId === "props" && propGroupFilter !== "all" && propGroupFilter !== "unassigned") next.propGroupId = propGroupFilter;
@@ -240,6 +250,10 @@ export function CatalogManager() {
       setError("Короткое описание должно объяснять предложение хотя бы одним предложением.");
       return;
     }
+    if (!selectedId && pendingImages.files.length && pendingImages.alt.trim().length < 2) {
+      setError("Добавьте короткое описание выбранных фотографий.");
+      return;
+    }
     setSaving(true); setError(null); setMessage(null);
     try {
       const normalizedIsProp = draft.kind === "prop";
@@ -265,20 +279,44 @@ export function CatalogManager() {
         badges: draft.badges.map((item) => item.trim()).filter(Boolean),
       };
       const saved = await saveCatalogItem(selectedId, normalized, user.id);
-      setItems((current) => selectedId ? current.map((item) => item.id === saved.id ? saved : item) : [saved, ...current]);
+      let savedWithMedia = saved;
+      if (!selectedId && pendingImages.files.length) {
+        try {
+          const uploadedMedia = await uploadCatalogImages(
+            saved.id,
+            pendingImages.files.map((file, index) => ({
+              file,
+              alt: pendingImages.files.length > 1 ? `${pendingImages.alt.trim()} ${index + 1}` : pendingImages.alt.trim(),
+            })),
+            saved.media.length,
+          );
+          savedWithMedia = { ...saved, media: [...saved.media, ...uploadedMedia] };
+          resetPendingImages();
+        } catch (cause) {
+          setItems((current) => [saved, ...current]);
+          setSelectedId(saved.id);
+          const { id: _id, updatedAt: _updatedAt, media: _media, presentationUrl: _presentationUrl, ...input } = saved;
+          setDraft(input);
+          throw new Error(`Карточка сохранена, но фотографии загрузить не удалось. ${cause instanceof Error ? cause.message : "Попробуйте загрузить их ещё раз."}`);
+        }
+      }
+      setItems((current) => selectedId ? current.map((item) => item.id === savedWithMedia.id ? savedWithMedia : item) : [savedWithMedia, ...current]);
       if (createNext && normalizedIsProp) {
         const next = emptyItem("props");
-        next.status = saved.status;
-        next.propGroupId = saved.propGroupId;
+        next.status = savedWithMedia.status;
+        next.propGroupId = savedWithMedia.propGroupId;
         setSelectedId(null);
         setDraft(next);
         setMessage("Реквизит сохранён. Можно сразу добавить следующую позицию.");
         requestAnimationFrame(() => titleInputRef.current?.focus());
       } else {
-        setSelectedId(saved.id);
-        const { id: _id, updatedAt: _updatedAt, media: _media, presentationUrl: _presentationUrl, ...input } = saved;
+        setSelectedId(savedWithMedia.id);
+        const { id: _id, updatedAt: _updatedAt, media: _media, presentationUrl: _presentationUrl, ...input } = savedWithMedia;
         setDraft(input);
-        setMessage(saved.status === "published" ? "Карточка сохранена и видна в каталоге." : "Черновик сохранён.");
+        const hasNewImages = !selectedId && pendingImages.files.length > 0;
+        setMessage(savedWithMedia.status === "published"
+          ? hasNewImages ? "Карточка и фотографии сохранены и видны в каталоге." : "Карточка сохранена и видна в каталоге."
+          : hasNewImages ? "Черновик и фотографии сохранены." : "Черновик сохранён.");
       }
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Не удалось сохранить карточку."); }
     finally { setSaving(false); }
@@ -421,7 +459,7 @@ export function CatalogManager() {
         </div> : <label className={uploadingPresentation ? "admin-presentationUpload is-disabled" : "admin-presentationUpload"} role="button" tabIndex={!canEdit || uploadingPresentation ? -1 : 0} aria-disabled={!canEdit || uploadingPresentation} onKeyDown={openFilePickerFromKeyboard}>{uploadingPresentation ? <LoaderCircle className="is-spinning" size={20} /> : <Upload size={20} />}<span><strong>{uploadingPresentation ? "Загружаем…" : "Выбрать PDF"}</strong><small>Презентация появится в клиентском каталоге</small></span><input type="file" accept="application/pdf,.pdf" disabled={!canEdit || uploadingPresentation} onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadPresentation(file); event.currentTarget.value = ""; }} /></label>}
       </section> : null}
 
-      <section className="admin-mediaSection"><header><div><h3>Фотографии</h3><p>Можно выбрать сразу несколько файлов. Первое изображение станет обложкой, остальные появятся в галерее карточки.</p></div></header>{selectedId ? <MediaUploader multiple onUpload={upload} label="Добавить фотографии" /> : <p className="admin-inlineNotice">Сохраните карточку, чтобы загрузить изображения.</p>}<div className="admin-mediaGrid">{selected?.media.map((media, index) => <figure key={media.id}><span className="admin-mediaGrid__index">{index === 0 ? "Обложка" : `Фото ${index + 1}`}</span><img src={media.src} alt={media.alt} /><figcaption>{media.alt}</figcaption>{canDeleteMedia ? <button type="button" onClick={() => void deleteCatalogImage(media).then(load)}><Archive size={15} /> Удалить</button> : null}</figure>)}</div></section>
+      <section className="admin-mediaSection"><header><div><h3>Фотографии</h3><p>Можно выбрать сразу несколько файлов. Первое изображение станет обложкой, остальные появятся в галерее карточки.</p></div></header><MediaUploader multiple onUpload={upload} onPendingChange={(files, alt) => setPendingImages({ files, alt })} deferred={!selectedId} resetToken={mediaResetToken} suggestedAlt={draft.title} label={selectedId ? "Добавить фотографии" : "Выбрать фотографии"} /><div className="admin-mediaGrid">{selected?.media.map((media, index) => <figure key={media.id}><span className="admin-mediaGrid__index">{index === 0 ? "Обложка" : `Фото ${index + 1}`}</span><img src={media.src} alt={media.alt} /><figcaption>{media.alt}</figcaption>{canDeleteMedia ? <button type="button" onClick={() => void deleteCatalogImage(media).then(load)}><Archive size={15} /> Удалить</button> : null}</figure>)}</div></section>
     </section>
   </div>;
 }
