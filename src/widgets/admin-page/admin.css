@@ -1259,6 +1259,33 @@
   width: 100%;
 }
 
+.admin-manager__createActions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 7px;
+}
+
+.admin-manager__createActions > button {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid #171717;
+  border-radius: 5px;
+  padding: 0 12px;
+  background: #171717;
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.68rem;
+  font-weight: 720;
+}
+
+.admin-manager__createActions > .admin-propGroupsButton {
+  background: #fff;
+  color: #171717;
+}
+
 .admin-manager__tools > button,
 .admin-manager__editor > header button,
 .admin-leads > header button {
@@ -1275,6 +1302,151 @@
   cursor: pointer;
   font-size: 0.7rem;
   font-weight: 720;
+}
+
+.admin-propGroupsDialog {
+  width: min(900px, calc(100vw - 32px));
+  max-width: none;
+  max-height: min(760px, calc(100dvh - 32px));
+  overflow: hidden;
+  border: 1px solid #bfc1ba;
+  border-radius: 8px;
+  padding: 0;
+  background: #f7f7f4;
+  color: #171717;
+}
+
+.admin-propGroupsDialog::backdrop {
+  background: rgb(0 0 0 / 0.58);
+}
+
+.admin-propGroupsDialog > header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 24px;
+  border-bottom: 1px solid var(--admin-line);
+  padding: 22px 24px;
+  background: #fff;
+}
+
+.admin-propGroupsDialog > header span {
+  color: var(--admin-muted);
+  font-size: 0.6rem;
+  font-weight: 700;
+}
+
+.admin-propGroupsDialog > header h2 {
+  margin: 5px 0 0;
+  font-size: 1.35rem;
+}
+
+.admin-propGroupsDialog > header p {
+  max-width: 560px;
+  margin: 7px 0 0;
+  color: var(--admin-muted);
+  font-size: 0.7rem;
+  line-height: 1.5;
+}
+
+.admin-propGroupsDialog > header > button {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  place-items: center;
+  border: 1px solid var(--admin-line);
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+
+.admin-propGroupsDialog__create {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+  border-bottom: 1px solid var(--admin-line);
+  padding: 18px 24px;
+}
+
+.admin-propGroupsDialog label {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.admin-propGroupsDialog label > span {
+  color: var(--admin-muted);
+  font-size: 0.58rem;
+  font-weight: 700;
+}
+
+.admin-propGroupsDialog input {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid #d1d2cd;
+  border-radius: 5px;
+  padding: 0 10px;
+  background: #fff;
+  color: #171717;
+  font-size: 0.72rem;
+}
+
+.admin-propGroupsDialog__create > button,
+.admin-propGroupsDialog__list article > button {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid #171717;
+  border-radius: 5px;
+  padding: 0 12px;
+  background: #171717;
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.65rem;
+  font-weight: 700;
+}
+
+.admin-propGroupsDialog button:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.admin-propGroupsDialog__list {
+  max-height: 520px;
+  overflow-y: auto;
+  padding: 8px 24px 24px;
+}
+
+.admin-propGroupsDialog__list article {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) 90px 104px 112px 104px;
+  align-items: end;
+  gap: 8px;
+  border-bottom: 1px solid var(--admin-line);
+  padding: 12px 0;
+}
+
+.admin-propGroupsDialog__list article > button.is-visibility,
+.admin-propGroupsDialog__list article > button.is-save {
+  border-color: #c8c9c4;
+  background: #fff;
+  color: #292a27;
+}
+
+.admin-propGroupsDialog__list article > button.is-delete {
+  border-color: transparent;
+  background: transparent;
+  color: #8b3636;
+}
+
+.admin-propGroupsDialog__list article > button.is-confirm {
+  border-color: #8b3636;
+  background: #8b3636;
+  color: #fff;
 }
 
 .admin-manager__editor > header button.is-secondary {
@@ -2126,6 +2298,32 @@
 }
 
 @media (max-width: 720px) {
+  .admin-propGroupsDialog {
+    width: 100%;
+    max-height: 100dvh;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .admin-propGroupsDialog > header,
+  .admin-propGroupsDialog__create,
+  .admin-propGroupsDialog__list {
+    padding-inline: 16px;
+  }
+
+  .admin-propGroupsDialog__create,
+  .admin-propGroupsDialog__list article {
+    grid-template-columns: 1fr 92px;
+  }
+
+  .admin-propGroupsDialog__list article .is-order {
+    grid-column: 2;
+  }
+
+  .admin-propGroupsDialog__list article > button {
+    min-height: 42px;
+  }
+
   .admin-authShell {
     padding: 72px 18px 24px;
   }

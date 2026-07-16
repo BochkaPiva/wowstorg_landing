@@ -205,7 +205,7 @@ Deno.serve(async (request) => {
       const requestedIds = requestedCatalogSelection.map((item) => item.id);
       const { data: catalogItems, error: catalogError } = await supabase
         .from("catalog_items")
-        .select("id,title,category_id,stock_quantity")
+        .select("id,title,category_id,prop_group_id,stock_quantity")
         .in("id", requestedIds)
         .eq("status", "published");
       if (catalogError) throw catalogError;
@@ -220,6 +220,12 @@ Deno.serve(async (request) => {
 
       const itemById = new Map((catalogItems ?? []).map((item) => [item.id, item]));
       const categoryById = new Map((categories ?? []).map((category) => [category.id, category.title]));
+      const propGroupIds = Array.from(new Set((catalogItems ?? []).map((item) => item.prop_group_id).filter(Boolean)));
+      const { data: propGroups, error: propGroupError } = propGroupIds.length
+        ? await supabase.from("catalog_prop_groups").select("id,title").in("id", propGroupIds)
+        : { data: [], error: null };
+      if (propGroupError) throw propGroupError;
+      const propGroupById = new Map((propGroups ?? []).map((group) => [group.id, group.title]));
       catalogSelection = requestedCatalogSelection.map((requested) => {
         const catalogItem = itemById.get(requested.id);
         if (!catalogItem) throw new Error("invalid_payload");
@@ -229,7 +235,9 @@ Deno.serve(async (request) => {
         return {
           id: catalogItem.id,
           title: catalogItem.title,
-          section: categoryById.get(catalogItem.category_id) ?? "Каталог",
+          section: catalogItem.prop_group_id
+            ? propGroupById.get(catalogItem.prop_group_id) ?? categoryById.get(catalogItem.category_id) ?? "Каталог"
+            : categoryById.get(catalogItem.category_id) ?? "Каталог",
           quantity: requested.quantity,
         };
       });

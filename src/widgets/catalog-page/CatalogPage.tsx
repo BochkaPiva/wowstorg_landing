@@ -1,19 +1,39 @@
 import { ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight, Clock3, ExternalLink, FileText, Minus, Plus, Search, ShoppingBag, Users, X, ZoomIn } from "lucide-react";
-import { type TouchEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type TouchEvent, useEffect, useRef, useState } from "react";
 import { useCatalogCart } from "@features/catalog-cart/CatalogCartContext";
 import {
   type CatalogCategory,
   type CatalogItemRecord,
+  type CatalogPropGroup,
   listCatalogCategories,
-  listCatalogItems,
+  listCatalogPropGroups,
+  listPublicCatalogItems,
 } from "@features/catalog-data/catalogRepository";
+import { siteConfig } from "@shared/config/site";
 
 const sectionOrder: CatalogCategory["id"][] = ["teambuilding", "welcome", "game_zone", "props"];
+const propsPageSize = 30;
 
 function formatRange(min: number | null, max: number | null, suffix: string) {
   if (!min && !max) return null;
   if (min && max && min !== max) return `${min}–${max} ${suffix}`;
   return `${min ?? max} ${suffix}`;
+}
+
+function formatPrice(value: number | null) {
+  return value === null ? "Цена по запросу" : `${new Intl.NumberFormat("ru-RU").format(value)} ₽ / сутки`;
+}
+
+function paginationItems(current: number, total: number): Array<number | string> {
+  if (total <= 7) return Array.from({ length: total }, (_, index) => index + 1);
+  const pages = new Set([1, total, current - 1, current, current + 1]);
+  const sorted = Array.from(pages).filter((page) => page >= 1 && page <= total).sort((a, b) => a - b);
+  const result: Array<number | string> = [];
+  sorted.forEach((page, index) => {
+    if (index && page - sorted[index - 1] > 1) result.push(`ellipsis-${page}`);
+    result.push(page);
+  });
+  return result;
 }
 
 function CatalogPoster({ item, compact = false }: { item: CatalogItemRecord; compact?: boolean }) {
@@ -79,7 +99,7 @@ function CartDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   </dialog>;
 }
 
-function ItemDialog({ item, category, onClose }: { item: CatalogItemRecord | null; category?: CatalogCategory; onClose: () => void }) {
+function ItemDialog({ item, category, propGroup, onClose }: { item: CatalogItemRecord | null; category?: CatalogCategory; propGroup?: CatalogPropGroup; onClose: () => void }) {
   const dialogRef = useRef<HTMLDialogElement | null>(null);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const [activeImage, setActiveImage] = useState(0);
@@ -161,7 +181,7 @@ function ItemDialog({ item, category, onClose }: { item: CatalogItemRecord | nul
       {item.media.length > 1 ? <div className="catalog-detail__thumbs">{item.media.map((media, index) => <button className={index === activeImage ? "is-active" : ""} key={media.id} type="button" aria-label={`Показать фото ${index + 1}`} onClick={() => setActiveImage(index)}><img src={media.src} alt="" /></button>)}</div> : null}
     </div>
     <article className="catalog-detail__copy">
-      <span>{category?.title ?? "Каталог"}</span>
+      <span>{propGroup?.title ?? category?.title ?? "Каталог"}</span>
       <h2>{item.title}</h2>
       <p className="catalog-detail__lead">{item.shortDescription}</p>
       <div className="catalog-detail__facts">
@@ -176,7 +196,7 @@ function ItemDialog({ item, category, onClose }: { item: CatalogItemRecord | nul
       <div className="catalog-detail__actions">
         {cartItem
           ? <QuantityControl title={item.title} quantity={cartItem.quantity} maxQuantity={item.stockQuantity} variant="detail" onChange={(quantity) => setQuantity(item.id, quantity, item.stockQuantity)} />
-          : <button type="button" disabled={item.stockQuantity === 0} onClick={() => addItem({ id: item.id, title: item.title, section: category?.title ?? "Каталог", maxQuantity: item.stockQuantity })}>{item.stockQuantity === 0 ? "Нет в наличии" : "Добавить в подборку"} {item.stockQuantity === 0 ? null : <Plus size={18} />}</button>}
+          : <button type="button" disabled={item.stockQuantity === 0} onClick={() => addItem({ id: item.id, title: item.title, section: propGroup?.title ?? category?.title ?? "Каталог", maxQuantity: item.stockQuantity })}>{item.stockQuantity === 0 ? "Нет в наличии" : "Добавить в подборку"} {item.stockQuantity === 0 ? null : <Plus size={18} />}</button>}
         <a href="/#brief">Обсудить задачу <ArrowRight size={18} /></a>
       </div>
     </article>
@@ -192,12 +212,19 @@ function ItemDialog({ item, category, onClose }: { item: CatalogItemRecord | nul
 }
 
 export function CatalogPage() {
-  const initialSection = new URLSearchParams(window.location.search).get("section");
+  const initialParams = new URLSearchParams(window.location.search);
+  const initialSection = initialParams.get("section");
   const normalizedInitial = initialSection === "team" ? "teambuilding" : initialSection === "spaces" ? "game_zone" : initialSection;
   const [categories, setCategories] = useState<CatalogCategory[]>([]);
+  const [propGroups, setPropGroups] = useState<CatalogPropGroup[]>([]);
   const [items, setItems] = useState<CatalogItemRecord[]>([]);
   const [activeSection, setActiveSection] = useState<CatalogCategory["id"]>((sectionOrder.includes(normalizedInitial as CatalogCategory["id"]) ? normalizedInitial : "teambuilding") as CatalogCategory["id"]);
-  const [query, setQuery] = useState("");
+  const [activePropGroup, setActivePropGroup] = useState<string | null>(initialParams.get("group"));
+  const [page, setPage] = useState(Math.max(1, Number(initialParams.get("page")) || 1));
+  const [query, setQuery] = useState(initialParams.get("q") ?? "");
+  const [debouncedQuery, setDebouncedQuery] = useState(query);
+  const [totalItems, setTotalItems] = useState(0);
+  const [metadataReady, setMetadataReady] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<CatalogItemRecord | null>(null);
   const [loading, setLoading] = useState(true);
@@ -206,55 +233,143 @@ export function CatalogPage() {
 
   useEffect(() => {
     let active = true;
-    Promise.all([listCatalogCategories(), listCatalogItems()]).then(([nextCategories, nextItems]) => {
+    Promise.all([listCatalogCategories(), listCatalogPropGroups()]).then(([nextCategories, nextPropGroups]) => {
       if (!active) return;
       setCategories(nextCategories);
-      setItems(nextItems);
-      setLoading(false);
+      setPropGroups(nextPropGroups);
+      if (activePropGroup && !nextPropGroups.some((group) => group.slug === activePropGroup)) setActivePropGroup(null);
+      setMetadataReady(true);
     }).catch(() => { if (active) { setLoadError(true); setLoading(false); } });
     return () => { active = false; };
   }, []);
 
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebouncedQuery(query), 280);
+    return () => window.clearTimeout(timeout);
+  }, [query]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      const section = params.get("section");
+      if (sectionOrder.includes(section as CatalogCategory["id"])) setActiveSection(section as CatalogCategory["id"]);
+      setActivePropGroup(params.get("group"));
+      setPage(Math.max(1, Number(params.get("page")) || 1));
+      setQuery(params.get("q") ?? "");
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  useEffect(() => {
+    if (!metadataReady) return;
+    let active = true;
+    setLoading(true);
+    setLoadError(false);
+    const propGroupId = activeSection === "props"
+      ? propGroups.find((group) => group.slug === activePropGroup)?.id ?? null
+      : null;
+    void listPublicCatalogItems({
+      categoryId: activeSection,
+      propGroupId,
+      search: debouncedQuery,
+      page: activeSection === "props" ? page : 1,
+      pageSize: activeSection === "props" ? propsPageSize : undefined,
+    }).then((result) => {
+      if (!active) return;
+      setItems(result.items);
+      setTotalItems(result.total);
+      setLoading(false);
+    }).catch(() => {
+      if (!active) return;
+      setLoadError(true);
+      setLoading(false);
+    });
+    return () => { active = false; };
+  }, [activePropGroup, activeSection, debouncedQuery, metadataReady, page, propGroups]);
+
   const active = categories.find((section) => section.id === activeSection) ?? { id: activeSection, title: "Каталог", description: "", sortOrder: 0, isVisible: true };
-  const visibleItems = useMemo(() => items.filter((item) => {
-    if (item.categoryId !== activeSection || item.status !== "published") return false;
-    const needle = query.trim().toLocaleLowerCase("ru");
-    return !needle || `${item.title} ${item.shortDescription} ${item.badges.join(" ")}`.toLocaleLowerCase("ru").includes(needle);
-  }), [activeSection, items, query]);
+  const isProps = activeSection === "props";
+  const totalPages = isProps ? Math.max(1, Math.ceil(totalItems / propsPageSize)) : 1;
+
+  useEffect(() => {
+    if (isProps && page > totalPages) setPage(totalPages);
+  }, [isProps, page, totalPages]);
 
   useEffect(() => {
     document.title = `${active.title} - каталог ВАУСТОРГ`;
     document.querySelector('meta[name="description"]')?.setAttribute("content", `${active.description} Каталог агентства мероприятий ВАУСТОРГ в Омске.`);
   }, [active]);
 
-  const chooseSection = (id: CatalogCategory["id"]) => {
-    setActiveSection(id);
+  const replaceUrl = (updates: { section?: CatalogCategory["id"]; group?: string | null; page?: number; query?: string }, push = false) => {
     const url = new URL(window.location.href);
-    url.searchParams.set("section", id);
-    window.history.replaceState({}, "", url);
+    if (updates.section) url.searchParams.set("section", updates.section);
+    if (updates.group === null) url.searchParams.delete("group");
+    else if (updates.group) url.searchParams.set("group", updates.group);
+    if (updates.page === undefined || updates.page <= 1) url.searchParams.delete("page");
+    else url.searchParams.set("page", String(updates.page));
+    if (updates.query === undefined || !updates.query.trim()) url.searchParams.delete("q");
+    else url.searchParams.set("q", updates.query.trim());
+    window.history[push ? "pushState" : "replaceState"]({}, "", url);
   };
 
+  const chooseSection = (id: CatalogCategory["id"]) => {
+    setActiveSection(id);
+    setActivePropGroup(null);
+    setPage(1);
+    replaceUrl({ section: id, group: null, page: 1, query });
+  };
+
+  const choosePropGroup = (slug: string | null) => {
+    setActivePropGroup(slug);
+    setPage(1);
+    replaceUrl({ section: "props", group: slug, page: 1, query });
+  };
+
+  const choosePage = (nextPage: number) => {
+    const normalizedPage = Math.min(totalPages, Math.max(1, nextPage));
+    setPage(normalizedPage);
+    replaceUrl({ section: "props", group: activePropGroup, page: normalizedPage, query }, true);
+    document.querySelector(".catalog-page__propFilters")?.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      block: "start",
+    });
+  };
+
+  const firstVisibleItem = isProps && totalItems ? (page - 1) * propsPageSize + 1 : 0;
+  const lastVisibleItem = isProps ? Math.min(page * propsPageSize, totalItems) : totalItems;
+
   return <main className="catalog-page">
-    <nav className="catalog-page__nav" aria-label="Навигация каталога"><a className="catalog-page__brand" href="/">ВАУСТОРГ</a><a className="catalog-page__back" href="/"><ArrowLeft size={17} /> На главную</a><button className="catalog-page__cartButton" type="button" onClick={() => setCartOpen(true)} aria-label={`Открыть подборку, позиций: ${totalQuantity}`}><ShoppingBag size={18} /> Подборка <span aria-live="polite" aria-atomic="true">{totalQuantity}</span></button></nav>
-    <header className="catalog-page__hero"><p>Каталог решений и реквизита</p><h1>Соберите событие <span>в одном месте.</span></h1><div><p>Начните с готового формата или выберите отдельные позиции. Подборка сохранит состав и передаст его вместе с заявкой.</p><a href="/#brief">Обсудить задачу <ArrowRight size={18} /></a></div></header>
+    <nav className="catalog-page__nav" aria-label="Навигация каталога"><a className="catalog-page__brand" href="/" aria-label={`На главную — ${siteConfig.brandName}`}><img src="/favicon-32x32.png" width="30" height="30" alt="" /><span>{siteConfig.brandName}</span></a><a className="catalog-page__back" href="/"><ArrowLeft size={17} /> На главную</a><button className="catalog-page__cartButton" type="button" onClick={() => setCartOpen(true)} aria-label={`Открыть подборку, позиций: ${totalQuantity}`}><ShoppingBag size={18} /> Подборка <span aria-live="polite" aria-atomic="true">{totalQuantity}</span></button></nav>
+    <header className="catalog-page__hero">
+      <p className="catalog-page__heroLabel">Каталог решений и реквизита</p>
+      <h1>Соберите событие <span>в одном месте.</span></h1>
+      <div className="catalog-page__heroIntro"><p>Начните с готового формата или выберите отдельные позиции. Подборка сохранит состав и передаст его вместе с заявкой.</p><a href="/#brief">Обсудить задачу <ArrowRight size={18} /></a></div>
+      <img className="catalog-page__heroDino" src="/catalog-dino.webp" width="748" height="1484" alt="" aria-hidden="true" />
+    </header>
     <section className="catalog-page__workspace" aria-labelledby="catalog-section-title">
-      <div className="catalog-page__toolbar"><div className="catalog-page__sections" role="tablist" aria-label="Разделы каталога">{categories.map((section, index) => <button key={section.id} id={`catalog-tab-${section.id}`} type="button" role="tab" aria-selected={section.id === activeSection} className={section.id === activeSection ? "is-active" : ""} onClick={() => chooseSection(section.id)}><span>0{index + 1}</span>{section.title}</button>)}</div><label className="catalog-page__search"><Search size={18} aria-hidden="true" /><span className="sr-only">Поиск по каталогу</span><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Найти формат или реквизит" /></label></div>
+      <div className="catalog-page__toolbar"><div className="catalog-page__sections" role="tablist" aria-label="Разделы каталога">{categories.map((section, index) => <button key={section.id} id={`catalog-tab-${section.id}`} type="button" role="tab" aria-selected={section.id === activeSection} className={section.id === activeSection ? "is-active" : ""} onClick={() => chooseSection(section.id)}><span>0{index + 1}</span>{section.title}</button>)}</div><label className="catalog-page__search"><Search size={18} aria-hidden="true" /><span className="sr-only">Поиск по каталогу</span><input type="search" value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); replaceUrl({ section: activeSection, group: activePropGroup, page: 1, query: event.target.value }); }} placeholder="Найти формат или реквизит" /></label></div>
       <header className="catalog-page__sectionHead"><div><span>Раздел</span><h2 id="catalog-section-title">{active.title}</h2></div><p>{active.description}</p></header>
-      {loading ? <div className="catalog-page__skeleton" aria-label="Загружаем каталог">{[1, 2, 3].map((key) => <span key={key} />)}</div> : null}
+      {isProps ? <div className="catalog-page__propFilters"><div role="group" aria-label="Разделы реквизита"><button className={!activePropGroup ? "is-active" : ""} type="button" aria-pressed={!activePropGroup} onClick={() => choosePropGroup(null)}>Весь реквизит</button>{propGroups.map((group) => <button className={activePropGroup === group.slug ? "is-active" : ""} type="button" aria-pressed={activePropGroup === group.slug} key={group.id} onClick={() => choosePropGroup(group.slug)}>{group.title}</button>)}</div><span aria-live="polite">{totalItems ? `${firstVisibleItem}–${lastVisibleItem} из ${totalItems}` : "0 позиций"}</span></div> : null}
+      {loading ? <div className={isProps ? "catalog-page__skeleton catalog-page__skeleton--props" : "catalog-page__skeleton"} aria-label="Загружаем каталог">{Array.from({ length: isProps ? 10 : 3 }, (_, index) => <span key={index} />)}</div> : null}
       {!loading && loadError ? <div className="catalog-page__notice"><strong>Не удалось загрузить каталог</strong><p>Обновите страницу или оставьте заявку: мы соберём подборку вручную.</p></div> : null}
-      {!loading && !loadError && visibleItems.length ? <div className="catalog-page__grid">{visibleItems.map((item, index) => {
+      {!loading && !loadError && items.length ? <div className={isProps ? "catalog-page__grid catalog-page__grid--props" : "catalog-page__grid"}>{items.map((item, index) => {
         const category = categories.find((entry) => entry.id === item.categoryId);
+        const propGroup = propGroups.find((group) => group.id === item.propGroupId);
         const cartItem = cartItems.find((entry) => entry.id === item.id);
-        return <article className="catalog-card" key={item.id}>
-          <button className="catalog-card__media" type="button" onClick={() => setSelectedItem(item)} aria-label={`Открыть ${item.title}`}><CatalogPoster item={item} /><span>0{index + 1}</span></button>
-          <div className="catalog-card__body"><div className="catalog-card__badges">{item.badges.slice(0, 2).map((badge) => <span key={badge}>{badge}</span>)}</div><h3>{item.title}</h3><p>{item.shortDescription}</p><div className="catalog-card__actions"><button type="button" onClick={() => setSelectedItem(item)}>Подробнее <ArrowRight size={17} /></button>{cartItem
+        const displayIndex = isProps ? (page - 1) * propsPageSize + index + 1 : index + 1;
+        const badges = isProps ? [propGroup?.title, ...item.badges].filter(Boolean).slice(0, 2) as string[] : item.badges.slice(0, 2);
+        return <article className={isProps ? "catalog-card catalog-card--prop" : "catalog-card"} key={item.id}>
+          <button className="catalog-card__media" type="button" onClick={() => setSelectedItem(item)} aria-label={`Открыть ${item.title}`}><CatalogPoster item={item} /><span>{String(displayIndex).padStart(2, "0")}</span></button>
+          <div className="catalog-card__body"><div className="catalog-card__badges">{badges.map((badge) => <span key={badge}>{badge}</span>)}</div><h3>{item.title}</h3><p>{item.shortDescription}</p>{isProps ? <div className="catalog-card__propMeta"><strong>{formatPrice(item.priceFrom)}</strong><span>{item.stockQuantity === null ? "Количество уточняйте" : item.stockQuantity > 0 ? `В наличии: ${item.stockQuantity}` : "Нет в наличии"}</span></div> : null}<div className="catalog-card__actions"><button type="button" onClick={() => setSelectedItem(item)}>Подробнее <ArrowRight size={17} /></button>{cartItem
             ? <QuantityControl title={item.title} quantity={cartItem.quantity} maxQuantity={item.stockQuantity} variant="card" onChange={(quantity) => setQuantity(item.id, quantity, item.stockQuantity)} />
-            : <button type="button" disabled={item.stockQuantity === 0} onClick={() => addItem({ id: item.id, title: item.title, section: category?.title ?? "Каталог", maxQuantity: item.stockQuantity })}>{item.stockQuantity === 0 ? "Нет в наличии" : "В подборку"} {item.stockQuantity === 0 ? null : <Plus size={17} />}</button>}</div></div>
+            : <button type="button" disabled={item.stockQuantity === 0} onClick={() => addItem({ id: item.id, title: item.title, section: propGroup?.title ?? category?.title ?? "Каталог", maxQuantity: item.stockQuantity })}>{item.stockQuantity === 0 ? "Нет в наличии" : "В подборку"} {item.stockQuantity === 0 ? null : <Plus size={17} />}</button>}</div></div>
         </article>;
       })}</div> : null}
-      {!loading && !loadError && !visibleItems.length ? <div className="catalog-page__notice"><strong>{query ? "Ничего не нашли" : "Раздел готовится"}</strong><p>{query ? "Попробуйте изменить запрос или выбрать соседний раздел." : "Оставьте задачу, и мы соберём решение вручную."}</p><a href="/#brief">Получить подборку <ArrowRight size={18} /></a></div> : null}
+      {!loading && !loadError && isProps && totalPages > 1 ? <nav className="catalog-page__pagination" aria-label="Страницы реквизита"><button type="button" disabled={page === 1} onClick={() => choosePage(page - 1)} aria-label="Предыдущая страница"><ChevronLeft size={18} /></button>{paginationItems(page, totalPages).map((item) => typeof item === "number" ? <button type="button" className={item === page ? "is-active" : ""} aria-current={item === page ? "page" : undefined} key={item} onClick={() => choosePage(item)}>{item}</button> : <span key={item} aria-hidden="true">…</span>)}<button type="button" disabled={page === totalPages} onClick={() => choosePage(page + 1)} aria-label="Следующая страница"><ChevronRight size={18} /></button></nav> : null}
+      {!loading && !loadError && !items.length ? <div className="catalog-page__notice"><strong>{query ? "Ничего не нашли" : activePropGroup ? "В этом разделе пока пусто" : "Раздел готовится"}</strong><p>{query ? "Попробуйте изменить запрос или выбрать соседний раздел." : activePropGroup ? "Посмотрите весь реквизит или выберите другой раздел." : "Оставьте задачу, и мы соберём решение вручную."}</p><a href="/#brief">Получить подборку <ArrowRight size={18} /></a></div> : null}
     </section>
     <CartDialog open={cartOpen} onClose={() => setCartOpen(false)} />
-    <ItemDialog item={selectedItem} category={categories.find((entry) => entry.id === selectedItem?.categoryId)} onClose={() => setSelectedItem(null)} />
+    <ItemDialog item={selectedItem} category={categories.find((entry) => entry.id === selectedItem?.categoryId)} propGroup={propGroups.find((group) => group.id === selectedItem?.propGroupId)} onClose={() => setSelectedItem(null)} />
   </main>;
 }

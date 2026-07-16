@@ -271,13 +271,11 @@ export function LeadForm() {
               <button type="button" onClick={() => { setForm(initialState); setStep(1); setSubmissionStatus("idle"); setSubmissionMessage(""); setTurnstileToken(""); setChallengeKey((current) => current + 1); }}>Отправить ещё одну заявку</button>
             </div>
           ) : <>
-          {cartItems.length ? (
-            <div className="brief-cartSummary">
-              <ShoppingBag size={20} aria-hidden="true" />
-              <div><strong>К заявке прикреплена подборка</strong><span>{totalQuantity} поз. из каталога</span></div>
-              <a href="/catalog">Изменить</a>
-            </div>
-          ) : null}
+          <div className={cartItems.length ? "brief-cartSummary is-selected" : "brief-cartSummary is-empty"}>
+            <span className="brief-cartSummary__icon"><ShoppingBag size={19} aria-hidden="true" /></span>
+            <div>{cartItems.length ? <><strong>К заявке прикреплена подборка</strong><span>{totalQuantity} поз. из каталога</span></> : <><strong>Сначала загляните в каталог</strong><span>Посмотрите программы, игровые зоны и реквизит — выбранные позиции автоматически появятся в заявке.</span></>}</div>
+            <a href="/catalog">{cartItems.length ? "Изменить подборку" : "Открыть каталог"} <ArrowRight size={16} aria-hidden="true" /></a>
+          </div>
           <div className="brief-form__progress" aria-label={`Шаг ${step} из 2`}>
             <span className={step >= 1 ? "is-active" : ""}>01 Событие</span>
             <span className={step >= 2 ? "is-active" : ""}>02 Контакт</span>

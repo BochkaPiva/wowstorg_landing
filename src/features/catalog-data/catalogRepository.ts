@@ -16,9 +16,18 @@ export type CatalogMediaRecord = {
   sortOrder: number;
 };
 
+export type CatalogPropGroup = {
+  id: string;
+  slug: string;
+  title: string;
+  sortOrder: number;
+  isVisible: boolean;
+};
+
 export type CatalogItemRecord = {
   id: string;
   categoryId: CatalogCategory["id"];
+  propGroupId: string | null;
   kind: "package" | "zone" | "service" | "prop";
   slug: string;
   title: string;
@@ -49,6 +58,7 @@ export type CatalogItemRecord = {
 type CatalogItemRow = {
   id: string;
   category_id: CatalogCategory["id"];
+  prop_group_id: string | null;
   kind: CatalogItemRecord["kind"];
   slug: string;
   title: string;
@@ -79,6 +89,7 @@ function mapItem(row: CatalogItemRow): CatalogItemRecord {
   return {
     id: row.id,
     categoryId: row.category_id,
+    propGroupId: row.prop_group_id,
     kind: row.kind,
     slug: row.slug,
     title: row.title,
@@ -127,6 +138,23 @@ export async function listCatalogCategories(): Promise<CatalogCategory[]> {
   }));
 }
 
+export async function listCatalogPropGroups(includeHidden = false): Promise<CatalogPropGroup[]> {
+  let query = requireSupabase().from("catalog_prop_groups")
+    .select("id, slug, title, sort_order, is_visible")
+    .order("sort_order")
+    .order("title");
+  if (!includeHidden) query = query.eq("is_visible", true);
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    slug: row.slug,
+    title: row.title,
+    sortOrder: row.sort_order,
+    isVisible: row.is_visible,
+  }));
+}
+
 export async function listCatalogItems(): Promise<CatalogItemRecord[]> {
   const { data, error } = await requireSupabase().from("catalog_items")
     .select("*, catalog_media(id, storage_path, alt_text, sort_order)")
@@ -137,11 +165,56 @@ export async function listCatalogItems(): Promise<CatalogItemRecord[]> {
   return ((data ?? []) as CatalogItemRow[]).map(mapItem);
 }
 
+export type PublicCatalogPage = {
+  items: CatalogItemRecord[];
+  total: number;
+};
+
+export async function listPublicCatalogItems({
+  categoryId,
+  propGroupId = null,
+  search = "",
+  page = 1,
+  pageSize,
+}: {
+  categoryId: CatalogCategory["id"];
+  propGroupId?: string | null;
+  search?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<PublicCatalogPage> {
+  let query = requireSupabase().from("catalog_items")
+    .select("*, catalog_media(id, storage_path, alt_text, sort_order)", { count: "exact" })
+    .eq("category_id", categoryId)
+    .eq("status", "published");
+
+  if (categoryId === "props" && propGroupId) query = query.eq("prop_group_id", propGroupId);
+  const normalizedSearch = search.trim().replace(/[%_,()]/g, " ").replace(/\s+/g, " ");
+  if (normalizedSearch) {
+    query = query.or(`title.ilike.%${normalizedSearch}%,short_description.ilike.%${normalizedSearch}%`);
+  }
+
+  query = query
+    .order("is_featured", { ascending: false })
+    .order("sort_order")
+    .order("created_at", { ascending: false });
+
+  if (pageSize) {
+    const from = Math.max(0, page - 1) * pageSize;
+    query = query.range(from, from + pageSize - 1);
+  }
+
+  const { data, error, count } = await query;
+  if (error) throw error;
+  return { items: ((data ?? []) as CatalogItemRow[]).map(mapItem), total: count ?? 0 };
+}
+
 export type CatalogItemInput = Omit<CatalogItemRecord, "id" | "updatedAt" | "media" | "presentationUrl">;
 
 function toPayload(input: CatalogItemInput, userId: string) {
   return {
     category_id: input.categoryId,
+    prop_group_id: input.categoryId === "props" ? input.propGroupId : null,
     kind: input.kind,
     slug: input.slug,
     title: input.title.trim(),
@@ -166,6 +239,38 @@ function toPayload(input: CatalogItemInput, userId: string) {
     sort_order: input.sortOrder,
     updated_by: userId,
   };
+}
+
+export async function saveCatalogPropGroup(
+  id: string | null,
+  input: Omit<CatalogPropGroup, "id">,
+  userId: string,
+): Promise<CatalogPropGroup> {
+  const payload = {
+    slug: input.slug,
+    title: input.title.trim(),
+    sort_order: input.sortOrder,
+    is_visible: input.isVisible,
+    updated_by: userId,
+  };
+  const client = requireSupabase();
+  const request = id
+    ? client.from("catalog_prop_groups").update(payload).eq("id", id)
+    : client.from("catalog_prop_groups").insert(payload);
+  const { data, error } = await request.select("id, slug, title, sort_order, is_visible").single();
+  if (error) throw error;
+  return {
+    id: data.id,
+    slug: data.slug,
+    title: data.title,
+    sortOrder: data.sort_order,
+    isVisible: data.is_visible,
+  };
+}
+
+export async function deleteCatalogPropGroup(id: string) {
+  const { error } = await requireSupabase().from("catalog_prop_groups").delete().eq("id", id);
+  if (error) throw error;
 }
 
 export async function saveCatalogItem(id: string | null, input: CatalogItemInput, userId: string): Promise<CatalogItemRecord> {

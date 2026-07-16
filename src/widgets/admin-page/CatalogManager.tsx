@@ -6,17 +6,21 @@ import {
   deleteCatalogPresentation,
   listCatalogCategories,
   listCatalogItems,
+  listCatalogPropGroups,
   saveCatalogItem,
   type CatalogCategory,
   type CatalogItemInput,
   type CatalogItemRecord,
+  type CatalogPropGroup,
   uploadCatalogImage,
   uploadCatalogPresentation,
 } from "@features/catalog-data/catalogRepository";
 import { MediaUploader } from "./MediaUploader";
+import { PropGroupsManager } from "./PropGroupsManager";
 
 const emptyItem = (categoryId: CatalogCategory["id"] = "teambuilding"): CatalogItemInput => ({
   categoryId,
+  propGroupId: null,
   kind: categoryId === "props" ? "prop" : categoryId === "teambuilding" ? "package" : "zone",
   slug: "",
   title: "",
@@ -82,10 +86,12 @@ export function CatalogManager() {
   const titleInputRef = useRef<HTMLInputElement | null>(null);
   const [categories, setCategories] = useState<CatalogCategory[]>([]);
   const [items, setItems] = useState<CatalogItemRecord[]>([]);
+  const [propGroups, setPropGroups] = useState<CatalogPropGroup[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draft, setDraft] = useState<CatalogItemInput>(emptyItem());
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<"all" | CatalogCategory["id"]>("all");
+  const [propGroupFilter, setPropGroupFilter] = useState<"all" | "unassigned" | string>("all");
   const [kindFilter, setKindFilter] = useState<"all" | CatalogItemRecord["kind"]>("all");
   const [statusFilter, setStatusFilter] = useState<"all" | CatalogItemRecord["status"]>("all");
   const [loading, setLoading] = useState(true);
@@ -97,14 +103,21 @@ export function CatalogManager() {
   const selected = items.find((item) => item.id === selectedId) ?? null;
   const canEdit = profile?.role !== "viewer";
   const canDeleteMedia = profile?.role === "owner" || profile?.role === "admin";
+  const updatePropGroups = (nextGroups: CatalogPropGroup[]) => {
+    const existingIds = new Set(nextGroups.map((group) => group.id));
+    setPropGroups(nextGroups);
+    setItems((current) => current.map((item) => item.propGroupId && !existingIds.has(item.propGroupId) ? { ...item, propGroupId: null } : item));
+    setDraft((current) => current.propGroupId && !existingIds.has(current.propGroupId) ? { ...current, propGroupId: null } : current);
+  };
 
   const load = async () => {
     setLoading(true);
     setError(null);
     try {
-      const [nextCategories, nextItems] = await Promise.all([listCatalogCategories(), listCatalogItems()]);
+      const [nextCategories, nextItems, nextPropGroups] = await Promise.all([listCatalogCategories(), listCatalogItems(), listCatalogPropGroups(true)]);
       setCategories(nextCategories);
       setItems(nextItems);
+      setPropGroups(nextPropGroups);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Не удалось загрузить каталог.");
     } finally { setLoading(false); }
@@ -118,12 +131,13 @@ export function CatalogManager() {
       const searchable = `${item.title} ${item.slug} ${item.shortDescription} ${item.badges.join(" ")}`.toLocaleLowerCase("ru");
       return (!needle || searchable.includes(needle))
         && (categoryFilter === "all" || item.categoryId === categoryFilter)
+        && (categoryFilter !== "props" || propGroupFilter === "all" || (propGroupFilter === "unassigned" ? !item.propGroupId : item.propGroupId === propGroupFilter))
         && (kindFilter === "all" || item.kind === kindFilter)
         && (statusFilter === "all" || item.status === statusFilter);
     });
-  }, [categoryFilter, items, kindFilter, query, statusFilter]);
+  }, [categoryFilter, items, kindFilter, propGroupFilter, query, statusFilter]);
 
-  const hasFilters = Boolean(query.trim()) || categoryFilter !== "all" || kindFilter !== "all" || statusFilter !== "all";
+  const hasFilters = Boolean(query.trim()) || categoryFilter !== "all" || propGroupFilter !== "all" || kindFilter !== "all" || statusFilter !== "all";
 
   const select = (item: CatalogItemRecord) => {
     setSelectedId(item.id);
@@ -134,8 +148,10 @@ export function CatalogManager() {
   };
   const create = () => {
     const categoryId = categoryFilter === "all" ? categories[0]?.id : categoryFilter;
+    const next = emptyItem(categoryId);
+    if (categoryId === "props" && propGroupFilter !== "all" && propGroupFilter !== "unassigned") next.propGroupId = propGroupFilter;
     setSelectedId(null);
-    setDraft(emptyItem(categoryId));
+    setDraft(next);
     setMessage(null);
     setError(null);
     requestAnimationFrame(() => titleInputRef.current?.focus());
@@ -157,6 +173,7 @@ export function CatalogManager() {
       return {
         ...current,
         categoryId,
+        propGroupId: null,
         kind: categoryId === "teambuilding" ? "package" : "zone",
         leadIntent: "selection",
         stockQuantity: null,
@@ -183,6 +200,7 @@ export function CatalogManager() {
       ...current,
       kind,
       categoryId,
+      propGroupId: null,
       leadIntent: current.leadIntent === "rent" ? "selection" : current.leadIntent,
       stockQuantity: null,
     };
@@ -251,6 +269,7 @@ export function CatalogManager() {
       if (createNext && normalizedIsProp) {
         const next = emptyItem("props");
         next.status = saved.status;
+        next.propGroupId = saved.propGroupId;
         setSelectedId(null);
         setDraft(next);
         setMessage("Реквизит сохранён. Можно сразу добавить следующую позицию.");
@@ -325,11 +344,12 @@ export function CatalogManager() {
         <div className="admin-manager__filters">
           <label className="is-wide">
             <span>Раздел</span>
-            <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value as typeof categoryFilter)}>
+            <select value={categoryFilter} onChange={(event) => { const value = event.target.value as typeof categoryFilter; setCategoryFilter(value); if (value !== "props") setPropGroupFilter("all"); }}>
               <option value="all">Все разделы</option>
               {categories.map((category) => <option key={category.id} value={category.id}>{category.title}</option>)}
             </select>
           </label>
+          {categoryFilter === "props" ? <label className="is-wide"><span>Раздел реквизита</span><select value={propGroupFilter} onChange={(event) => setPropGroupFilter(event.target.value)}><option value="all">Все разделы</option><option value="unassigned">Без раздела</option>{propGroups.map((group) => <option key={group.id} value={group.id}>{group.title}</option>)}</select></label> : null}
           <label>
             <span>Тип</span>
             <select value={kindFilter} onChange={(event) => setKindFilter(event.target.value as typeof kindFilter)}>
@@ -352,13 +372,13 @@ export function CatalogManager() {
         </div>
         <div className="admin-manager__filterMeta">
           <span>{filtered.length} из {items.length}</span>
-          {hasFilters ? <button type="button" onClick={() => { setQuery(""); setCategoryFilter("all"); setKindFilter("all"); setStatusFilter("all"); }}><RotateCcw size={13} /> Сбросить</button> : null}
+          {hasFilters ? <button type="button" onClick={() => { setQuery(""); setCategoryFilter("all"); setPropGroupFilter("all"); setKindFilter("all"); setStatusFilter("all"); }}><RotateCcw size={13} /> Сбросить</button> : null}
         </div>
-        <button className="admin-manager__new" type="button" onClick={create}><Plus size={17} /> Новая карточка</button>
+        <div className="admin-manager__createActions"><button className="admin-manager__new" type="button" onClick={create}><Plus size={17} /> Новая карточка</button><PropGroupsManager groups={propGroups} userId={user?.id ?? null} canEdit={canEdit} canDelete={canDeleteMedia} onChange={updatePropGroups} /></div>
       </div>
       {loading ? <div className="admin-listState"><LoaderCircle className="is-spinning" size={22} /> Загружаем позиции</div> : null}
       {!loading && !filtered.length ? <div className="admin-listState"><strong>{hasFilters ? "Ничего не найдено" : "Нет позиций"}</strong><span>{hasFilters ? "Измените запрос или сбросьте фильтры." : "Создайте первую карточку каталога."}</span></div> : null}
-      <div className="admin-manager__rows">{filtered.map((item) => <button className={selectedId === item.id ? "is-active" : ""} type="button" key={item.id} onClick={() => select(item)}><div className="admin-rowThumb">{item.media[0] ? <img src={item.media[0].src} alt="" /> : <ImageIcon size={18} />}</div><span><strong>{item.title}</strong><small>{categories.find((category) => category.id === item.categoryId)?.title} · {statusLabels[item.status]}</small></span><ChevronRight size={17} /></button>)}</div>
+      <div className="admin-manager__rows">{filtered.map((item) => <button className={selectedId === item.id ? "is-active" : ""} type="button" key={item.id} onClick={() => select(item)}><div className="admin-rowThumb">{item.media[0] ? <img src={item.media[0].src} alt="" /> : <ImageIcon size={18} />}</div><span><strong>{item.title}</strong><small>{item.categoryId === "props" ? propGroups.find((group) => group.id === item.propGroupId)?.title ?? "Без раздела" : categories.find((category) => category.id === item.categoryId)?.title} · {statusLabels[item.status]}</small></span><ChevronRight size={17} /></button>)}</div>
     </aside>
 
     <section className="admin-manager__editor">
@@ -367,6 +387,7 @@ export function CatalogManager() {
       <div className="admin-editorGrid">
         <label className="admin-field"><span>Название</span><input ref={titleInputRef} value={draft.title} onChange={(event) => update("title", event.target.value)} /></label>
         <label className="admin-field"><span>Раздел</span><select value={draft.categoryId} onChange={(event) => changeCategory(event.target.value as CatalogCategory["id"])}>{categories.map((category) => <option key={category.id} value={category.id}>{category.title}</option>)}</select></label>
+        {isProp ? <label className="admin-field"><span>Раздел реквизита</span><select value={draft.propGroupId ?? ""} onChange={(event) => update("propGroupId", event.target.value || null)}><option value="">Без раздела</option>{propGroups.map((group) => <option key={group.id} value={group.id}>{group.title}{group.isVisible ? "" : " · скрыт"}</option>)}</select><small>Сохранится и для следующей позиции.</small></label> : null}
         {!isProp ? <label className="admin-field"><span>Тип</span><select value={draft.kind} onChange={(event) => changeKind(event.target.value as CatalogItemInput["kind"])}>{Object.entries(kindLabels).filter(([value]) => value !== "prop").map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label> : null}
         <div className="admin-typeNote admin-field--wide"><strong>{editorProfile.title}</strong><span>{editorProfile.description}</span></div>
         <label className="admin-field"><span>{isProp ? "Цена за единицу" : "Цена от"}</span><input type="number" min="0" step={isProp ? 1 : 100} value={draft.priceFrom ?? ""} placeholder="Не указывать" onChange={(event) => update("priceFrom", event.target.value ? Number(event.target.value) : null)} /></label>
