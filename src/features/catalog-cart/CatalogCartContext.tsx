@@ -7,6 +7,7 @@ export type CatalogCartItem = {
   title: string;
   section: string;
   quantity: number;
+  maxQuantity?: number | null;
 };
 
 type CatalogCartValue = {
@@ -14,11 +15,15 @@ type CatalogCartValue = {
   totalQuantity: number;
   addItem: (item: Omit<CatalogCartItem, "quantity">) => void;
   removeItem: (id: string) => void;
-  setQuantity: (id: string, quantity: number) => void;
+  setQuantity: (id: string, quantity: number, maxQuantity?: number | null) => void;
   clearCart: () => void;
 };
 
 const CatalogCartContext = createContext<CatalogCartValue | null>(null);
+
+function clampQuantity(quantity: number, maxQuantity?: number | null) {
+  return Math.min(quantity, maxQuantity ?? Number.POSITIVE_INFINITY);
+}
 
 function readStoredCart(): CatalogCartItem[] {
   try {
@@ -42,14 +47,20 @@ export function CatalogCartProvider({ children }: { children: ReactNode }) {
     items,
     totalQuantity: items.reduce((sum, item) => sum + item.quantity, 0),
     addItem: (nextItem) => setItems((current) => {
+      if (nextItem.maxQuantity !== null && nextItem.maxQuantity !== undefined && nextItem.maxQuantity <= 0) return current;
       const existing = current.find((item) => item.id === nextItem.id);
       if (!existing) return [...current, { ...nextItem, quantity: 1 }];
-      return current.map((item) => item.id === nextItem.id ? { ...item, quantity: item.quantity + 1 } : item);
+      return current.map((item) => item.id === nextItem.id
+        ? { ...item, ...nextItem, quantity: clampQuantity(item.quantity + 1, nextItem.maxQuantity) }
+        : item);
     }),
     removeItem: (id) => setItems((current) => current.filter((item) => item.id !== id)),
-    setQuantity: (id, quantity) => setItems((current) => quantity <= 0
-      ? current.filter((item) => item.id !== id)
-      : current.map((item) => item.id === id ? { ...item, quantity } : item)),
+    setQuantity: (id, quantity, maxQuantity) => setItems((current) => current.flatMap((item) => {
+      if (item.id !== id) return [item];
+      const nextMaxQuantity = maxQuantity === undefined ? item.maxQuantity : maxQuantity;
+      const nextQuantity = clampQuantity(quantity, nextMaxQuantity);
+      return nextQuantity <= 0 ? [] : [{ ...item, maxQuantity: nextMaxQuantity, quantity: nextQuantity }];
+    })),
     clearCart: () => setItems([]),
   }), [items]);
 

@@ -220,6 +220,7 @@ export function LeadForm() {
           contactType: form.contactType,
           contact: form.contact,
           message,
+          catalogSelection: cartItems.map((item) => ({ id: item.id, quantity: item.quantity })),
           catalogSelectionIds: cartItems.flatMap((item) => Array.from({ length: item.quantity }, () => item.id)),
           consentVersion,
           turnstileToken,

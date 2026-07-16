@@ -26,6 +26,35 @@ function CatalogPoster({ item, compact = false }: { item: CatalogItemRecord; com
   </div>;
 }
 
+function QuantityControl({
+  title,
+  quantity,
+  maxQuantity,
+  onChange,
+  variant,
+}: {
+  title: string;
+  quantity: number;
+  maxQuantity?: number | null;
+  onChange: (quantity: number) => void;
+  variant: "card" | "detail" | "cart";
+}) {
+  const decreaseLabel = quantity === 1
+    ? `Убрать «${title}» из подборки`
+    : `Уменьшить количество «${title}»`;
+  const atLimit = maxQuantity !== null && maxQuantity !== undefined && quantity >= maxQuantity;
+
+  return <div className={`catalog-quantity catalog-quantity--${variant}`} role="group" aria-label={`Количество «${title}»`}>
+    <button type="button" onClick={() => onChange(quantity - 1)} aria-label={decreaseLabel} title={decreaseLabel}>
+      <Minus size={16} aria-hidden="true" />
+    </button>
+    <output aria-live="polite" aria-atomic="true">{quantity}<span className="sr-only"> шт.</span></output>
+    <button type="button" onClick={() => onChange(quantity + 1)} disabled={atLimit} aria-label={atLimit ? `Доступно максимум ${maxQuantity} шт.` : `Увеличить количество «${title}»`} title={atLimit ? `Доступно максимум ${maxQuantity} шт.` : `Увеличить количество «${title}»`}>
+      <Plus size={16} aria-hidden="true" />
+    </button>
+  </div>;
+}
+
 function CartDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const dialogRef = useRef<HTMLDialogElement | null>(null);
   const { items, totalQuantity, removeItem, setQuantity, clearCart } = useCatalogCart();
@@ -42,9 +71,7 @@ function CartDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
     {items.length ? <>
       <div className="catalog-cart__items">{items.map((item) => <article key={item.id}>
         <div><span>{item.section}</span><strong>{item.title}</strong></div>
-        <div className="catalog-cart__quantity" aria-label={`Количество: ${item.title}`}>
-          <button type="button" onClick={() => setQuantity(item.id, item.quantity - 1)} aria-label="Уменьшить количество"><Minus size={15} /></button><span>{item.quantity}</span><button type="button" onClick={() => setQuantity(item.id, item.quantity + 1)} aria-label="Увеличить количество"><Plus size={15} /></button>
-        </div>
+        <QuantityControl title={item.title} quantity={item.quantity} maxQuantity={item.maxQuantity} variant="cart" onChange={(quantity) => setQuantity(item.id, quantity)} />
         <button type="button" onClick={() => removeItem(item.id)}>Удалить</button>
       </article>)}</div>
       <div className="catalog-cart__footer"><button type="button" onClick={clearCart}>Очистить</button><a href="/#brief">Прикрепить к заявке <ArrowRight size={18} /></a></div>
@@ -57,7 +84,7 @@ function ItemDialog({ item, category, onClose }: { item: CatalogItemRecord | nul
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const [activeImage, setActiveImage] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
-  const { addItem, items } = useCatalogCart();
+  const { addItem, items, setQuantity } = useCatalogCart();
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -106,7 +133,7 @@ function ItemDialog({ item, category, onClose }: { item: CatalogItemRecord | nul
   }, [activeImage, item, lightboxOpen, mediaCount]);
 
   if (!item) return <dialog ref={dialogRef} />;
-  const inCart = items.some((cartItem) => cartItem.id === item.id);
+  const cartItem = items.find((entry) => entry.id === item.id);
   const guests = formatRange(item.guestMin, item.guestMax, "гостей");
   const duration = formatRange(item.durationMin, item.durationMax, "минут");
 
@@ -147,7 +174,9 @@ function ItemDialog({ item, category, onClose }: { item: CatalogItemRecord | nul
       {item.includedItems.length ? <section><h3>В составе</h3><ul>{item.includedItems.map((value) => <li key={value}><Check size={16} />{value}</li>)}</ul></section> : null}
       {item.requirements.length ? <section><h3>Что учесть</h3><ul>{item.requirements.map((value) => <li key={value}>{value}</li>)}</ul></section> : null}
       <div className="catalog-detail__actions">
-        <button type="button" onClick={() => addItem({ id: item.id, title: item.title, section: category?.title ?? "Каталог" })}>{inCart ? "Добавить ещё" : "Добавить в подборку"} <Plus size={18} /></button>
+        {cartItem
+          ? <QuantityControl title={item.title} quantity={cartItem.quantity} maxQuantity={item.stockQuantity} variant="detail" onChange={(quantity) => setQuantity(item.id, quantity, item.stockQuantity)} />
+          : <button type="button" disabled={item.stockQuantity === 0} onClick={() => addItem({ id: item.id, title: item.title, section: category?.title ?? "Каталог", maxQuantity: item.stockQuantity })}>{item.stockQuantity === 0 ? "Нет в наличии" : "Добавить в подборку"} {item.stockQuantity === 0 ? null : <Plus size={18} />}</button>}
         <a href="/#brief">Обсудить задачу <ArrowRight size={18} /></a>
       </div>
     </article>
@@ -173,7 +202,7 @@ export function CatalogPage() {
   const [selectedItem, setSelectedItem] = useState<CatalogItemRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
-  const { totalQuantity, addItem, items: cartItems } = useCatalogCart();
+  const { totalQuantity, addItem, setQuantity, items: cartItems } = useCatalogCart();
 
   useEffect(() => {
     let active = true;
@@ -206,7 +235,7 @@ export function CatalogPage() {
   };
 
   return <main className="catalog-page">
-    <nav className="catalog-page__nav" aria-label="Навигация каталога"><a className="catalog-page__brand" href="/">ВАУСТОРГ</a><a className="catalog-page__back" href="/"><ArrowLeft size={17} /> На главную</a><button className="catalog-page__cartButton" type="button" onClick={() => setCartOpen(true)}><ShoppingBag size={18} /> Подборка <span>{totalQuantity}</span></button></nav>
+    <nav className="catalog-page__nav" aria-label="Навигация каталога"><a className="catalog-page__brand" href="/">ВАУСТОРГ</a><a className="catalog-page__back" href="/"><ArrowLeft size={17} /> На главную</a><button className="catalog-page__cartButton" type="button" onClick={() => setCartOpen(true)} aria-label={`Открыть подборку, позиций: ${totalQuantity}`}><ShoppingBag size={18} /> Подборка <span aria-live="polite" aria-atomic="true">{totalQuantity}</span></button></nav>
     <header className="catalog-page__hero"><p>Каталог решений и реквизита</p><h1>Соберите событие <span>в одном месте.</span></h1><div><p>Начните с готового формата или выберите отдельные позиции. Подборка сохранит состав и передаст его вместе с заявкой.</p><a href="/#brief">Обсудить задачу <ArrowRight size={18} /></a></div></header>
     <section className="catalog-page__workspace" aria-labelledby="catalog-section-title">
       <div className="catalog-page__toolbar"><div className="catalog-page__sections" role="tablist" aria-label="Разделы каталога">{categories.map((section, index) => <button key={section.id} id={`catalog-tab-${section.id}`} type="button" role="tab" aria-selected={section.id === activeSection} className={section.id === activeSection ? "is-active" : ""} onClick={() => chooseSection(section.id)}><span>0{index + 1}</span>{section.title}</button>)}</div><label className="catalog-page__search"><Search size={18} aria-hidden="true" /><span className="sr-only">Поиск по каталогу</span><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Найти формат или реквизит" /></label></div>
@@ -215,10 +244,12 @@ export function CatalogPage() {
       {!loading && loadError ? <div className="catalog-page__notice"><strong>Не удалось загрузить каталог</strong><p>Обновите страницу или оставьте заявку: мы соберём подборку вручную.</p></div> : null}
       {!loading && !loadError && visibleItems.length ? <div className="catalog-page__grid">{visibleItems.map((item, index) => {
         const category = categories.find((entry) => entry.id === item.categoryId);
-        const inCart = cartItems.some((cartItem) => cartItem.id === item.id);
+        const cartItem = cartItems.find((entry) => entry.id === item.id);
         return <article className="catalog-card" key={item.id}>
           <button className="catalog-card__media" type="button" onClick={() => setSelectedItem(item)} aria-label={`Открыть ${item.title}`}><CatalogPoster item={item} /><span>0{index + 1}</span></button>
-          <div className="catalog-card__body"><div className="catalog-card__badges">{item.badges.slice(0, 2).map((badge) => <span key={badge}>{badge}</span>)}</div><h3>{item.title}</h3><p>{item.shortDescription}</p><div><button type="button" onClick={() => setSelectedItem(item)}>Подробнее <ArrowRight size={17} /></button><button className={inCart ? "is-added" : ""} type="button" onClick={() => addItem({ id: item.id, title: item.title, section: category?.title ?? "Каталог" })}>{inCart ? "Добавить ещё" : "В подборку"} <Plus size={17} /></button></div></div>
+          <div className="catalog-card__body"><div className="catalog-card__badges">{item.badges.slice(0, 2).map((badge) => <span key={badge}>{badge}</span>)}</div><h3>{item.title}</h3><p>{item.shortDescription}</p><div className="catalog-card__actions"><button type="button" onClick={() => setSelectedItem(item)}>Подробнее <ArrowRight size={17} /></button>{cartItem
+            ? <QuantityControl title={item.title} quantity={cartItem.quantity} maxQuantity={item.stockQuantity} variant="card" onChange={(quantity) => setQuantity(item.id, quantity, item.stockQuantity)} />
+            : <button type="button" disabled={item.stockQuantity === 0} onClick={() => addItem({ id: item.id, title: item.title, section: category?.title ?? "Каталог", maxQuantity: item.stockQuantity })}>{item.stockQuantity === 0 ? "Нет в наличии" : "В подборку"} {item.stockQuantity === 0 ? null : <Plus size={17} />}</button>}</div></div>
         </article>;
       })}</div> : null}
       {!loading && !loadError && !visibleItems.length ? <div className="catalog-page__notice"><strong>{query ? "Ничего не нашли" : "Раздел готовится"}</strong><p>{query ? "Попробуйте изменить запрос или выбрать соседний раздел." : "Оставьте задачу, и мы соберём решение вручную."}</p><a href="/#brief">Получить подборку <ArrowRight size={18} /></a></div> : null}

@@ -150,6 +150,13 @@ export type LandingLeadStatus =
   | "rejected"
   | "converted";
 
+export type LandingLeadCatalogItem = {
+  id: string;
+  title: string;
+  section: string;
+  quantity: number;
+};
+
 export type LandingLead = {
   id: string;
   status: LandingLeadStatus;
@@ -164,6 +171,7 @@ export type LandingLead = {
   dateIsFlexible?: boolean;
   message?: string;
   catalogSelectionIds: string[];
+  catalogSelection: LandingLeadCatalogItem[];
   createdAt: string;
   convertedProjectId?: string;
 };

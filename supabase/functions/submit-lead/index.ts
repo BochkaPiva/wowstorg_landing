@@ -10,10 +10,15 @@ type LeadPayload = {
   contactType?: unknown;
   contact?: unknown;
   message?: unknown;
+  catalogSelection?: unknown;
   catalogSelectionIds?: unknown;
   consentVersion?: unknown;
   turnstileToken?: unknown;
 };
+
+type CatalogSelectionInput = { id: string; quantity: number };
+type CanonicalCatalogSelection = CatalogSelectionInput & { title: string; section: string };
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type TurnstileResult = {
   success: boolean;
@@ -71,6 +76,37 @@ function text(value: unknown, maxLength: number, required = false): string {
   const normalized = value.trim();
   if ((required && !normalized) || normalized.length > maxLength) throw new Error("invalid_payload");
   return normalized;
+}
+
+function parseCatalogSelection(value: unknown, legacyIds: unknown): CatalogSelectionInput[] {
+  const quantities = new Map<string, number>();
+
+  if (Array.isArray(value)) {
+    if (value.length > 100) throw new Error("invalid_payload");
+    for (const entry of value) {
+      if (!entry || typeof entry !== "object") throw new Error("invalid_payload");
+      const candidate = entry as Record<string, unknown>;
+      const id = text(candidate.id, 160, true);
+      if (!uuidPattern.test(id)) throw new Error("invalid_payload");
+      const quantity = candidate.quantity;
+      if (typeof quantity !== "number" || !Number.isSafeInteger(quantity) || quantity < 1 || quantity > 200) {
+        throw new Error("invalid_payload");
+      }
+      quantities.set(id, (quantities.get(id) ?? 0) + quantity);
+    }
+  } else if (Array.isArray(legacyIds)) {
+    for (const rawId of legacyIds.slice(0, 200)) {
+      const id = text(rawId, 160, true);
+      if (!uuidPattern.test(id)) throw new Error("invalid_payload");
+      quantities.set(id, (quantities.get(id) ?? 0) + 1);
+    }
+  }
+
+  const selection = Array.from(quantities, ([id, quantity]) => ({ id, quantity }));
+  if (selection.length > 100 || selection.reduce((sum, item) => sum + item.quantity, 0) > 200) {
+    throw new Error("invalid_payload");
+  }
+  return selection;
 }
 
 function getClientIp(request: Request): string {
@@ -152,9 +188,7 @@ Deno.serve(async (request) => {
     const dateIsFlexible = payload.dateMode === "flexible";
     if (payload.dateMode !== "flexible" && payload.dateMode !== "known") throw new Error("invalid_payload");
     const eventDate = parseDate(payload.eventDate, dateIsFlexible);
-    const catalogSelectionIds = Array.isArray(payload.catalogSelectionIds)
-      ? payload.catalogSelectionIds.map((item) => text(item, 160, true)).slice(0, 200)
-      : [];
+    const requestedCatalogSelection = parseCatalogSelection(payload.catalogSelection, payload.catalogSelectionIds);
 
     const clientIp = getClientIp(request);
     const hostname = new URL(origin).hostname;
@@ -166,6 +200,41 @@ Deno.serve(async (request) => {
     const supabase = createClient(env("SUPABASE_URL"), supabaseAdminKey(), {
       auth: { persistSession: false, autoRefreshToken: false },
     });
+    let catalogSelection: CanonicalCatalogSelection[] = [];
+    if (requestedCatalogSelection.length) {
+      const requestedIds = requestedCatalogSelection.map((item) => item.id);
+      const { data: catalogItems, error: catalogError } = await supabase
+        .from("catalog_items")
+        .select("id,title,category_id,stock_quantity")
+        .in("id", requestedIds)
+        .eq("status", "published");
+      if (catalogError) throw catalogError;
+      if ((catalogItems ?? []).length !== requestedIds.length) throw new Error("invalid_payload");
+
+      const categoryIds = Array.from(new Set((catalogItems ?? []).map((item) => item.category_id)));
+      const { data: categories, error: categoryError } = await supabase
+        .from("catalog_categories")
+        .select("id,title")
+        .in("id", categoryIds);
+      if (categoryError) throw categoryError;
+
+      const itemById = new Map((catalogItems ?? []).map((item) => [item.id, item]));
+      const categoryById = new Map((categories ?? []).map((category) => [category.id, category.title]));
+      catalogSelection = requestedCatalogSelection.map((requested) => {
+        const catalogItem = itemById.get(requested.id);
+        if (!catalogItem) throw new Error("invalid_payload");
+        if (catalogItem.stock_quantity !== null && requested.quantity > catalogItem.stock_quantity) {
+          throw new Error("invalid_payload");
+        }
+        return {
+          id: catalogItem.id,
+          title: catalogItem.title,
+          section: categoryById.get(catalogItem.category_id) ?? "Каталог",
+          quantity: requested.quantity,
+        };
+      });
+    }
+    const catalogSelectionIds = catalogSelection.flatMap((item) => Array.from({ length: item.quantity }, () => item.id));
     const { data, error } = await supabase.rpc("accept_landing_lead", {
       p_name: name,
       p_company: company,
@@ -177,6 +246,7 @@ Deno.serve(async (request) => {
       p_date_is_flexible: dateIsFlexible,
       p_message: message,
       p_catalog_selection_ids: catalogSelectionIds,
+      p_catalog_selection: catalogSelection,
       p_consent_version: consentVersion,
       p_ip_hash: ipHash,
     });

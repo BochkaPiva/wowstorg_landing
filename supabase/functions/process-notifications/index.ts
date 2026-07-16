@@ -18,7 +18,15 @@ type Lead = {
   date_is_flexible: boolean;
   message: string | null;
   catalog_selection_ids: string[];
+  catalog_selection: unknown;
   created_at: string;
+};
+
+type CatalogSelectionItem = {
+  id: string;
+  title: string;
+  section: string;
+  quantity: number;
 };
 
 function env(name: string): string {
@@ -60,14 +68,52 @@ function escapeHtml(value: string): string {
     .replaceAll('"', "&quot;");
 }
 
+function parseCatalogSelection(lead: Lead): CatalogSelectionItem[] {
+  if (Array.isArray(lead.catalog_selection)) {
+    const validItems = lead.catalog_selection.filter((item): item is CatalogSelectionItem => {
+      if (!item || typeof item !== "object") return false;
+      const candidate = item as Record<string, unknown>;
+      return typeof candidate.id === "string"
+        && typeof candidate.title === "string"
+        && typeof candidate.section === "string"
+        && typeof candidate.quantity === "number"
+        && Number.isSafeInteger(candidate.quantity)
+        && candidate.quantity > 0;
+    });
+    if (validItems.length) return validItems;
+  }
+
+  const quantities = new Map<string, number>();
+  for (const id of lead.catalog_selection_ids ?? []) quantities.set(id, (quantities.get(id) ?? 0) + 1);
+  return Array.from(quantities, ([id, quantity]) => ({ id, title: id, section: "Каталог", quantity }));
+}
+
+function formatCatalogSelection(lead: Lead): string {
+  const selection = parseCatalogSelection(lead);
+  if (!selection.length) return "";
+
+  const maxLength = 1400;
+  const lines: string[] = [];
+  let usedLength = 0;
+  for (let index = 0; index < selection.length; index += 1) {
+    const item = selection[index];
+    const section = item.section ? ` <i>(${escapeHtml(item.section)})</i>` : "";
+    const line = `• ${escapeHtml(item.title)} — <b>${item.quantity} шт.</b>${section}`;
+    if (usedLength + line.length > maxLength) {
+      lines.push(`…и ещё ${selection.length - index} поз.`);
+      break;
+    }
+    lines.push(line);
+    usedLength += line.length + 1;
+  }
+  return `\n\n<b>Подборка:</b>\n${lines.join("\n")}`;
+}
+
 function formatLead(lead: Lead): string {
   const date = lead.date_is_flexible || !lead.event_date
     ? "уточняется"
     : new Intl.DateTimeFormat("ru-RU", { timeZone: "Asia/Omsk" }).format(new Date(`${lead.event_date}T00:00:00+06:00`));
-  const catalogSummary = truncate(lead.catalog_selection_ids.join(", "), 700);
-  const catalog = catalogSummary
-    ? `\n<b>Подборка:</b> ${escapeHtml(catalogSummary)}`
-    : "";
+  const catalog = formatCatalogSelection(lead);
   const comment = lead.message ? `\n<b>Комментарий:</b> ${escapeHtml(truncate(lead.message, 1200))}` : "";
 
   return [
@@ -132,7 +178,7 @@ Deno.serve(async (request) => {
 
     const { data: leads, error: leadError } = await supabase
       .from("landing_leads")
-      .select("id,name,company,contact_type,contact,event_type,guest_range,event_date,date_is_flexible,message,catalog_selection_ids,created_at")
+      .select("id,name,company,contact_type,contact,event_type,guest_range,event_date,date_is_flexible,message,catalog_selection_ids,catalog_selection,created_at")
       .in("id", notifications.map((item) => item.lead_id));
     if (leadError) throw leadError;
 
