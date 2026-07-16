@@ -13,6 +13,20 @@ import { siteConfig } from "@shared/config/site";
 
 const sectionOrder: CatalogCategory["id"][] = ["teambuilding", "welcome", "game_zone", "props"];
 const propsPageSize = 30;
+const seededCatalogCovers: Record<string, { src: string; alt: string }> = {
+  "komandnyy-konstruktor": { src: "/catalog-covers/komandnyy-konstruktor.webp", alt: "Команда строит общий город из блочного конструктора" },
+  "bolshoy-dachnyy-sezon": { src: "/catalog-covers/bolshoy-dachnyy-sezon.webp", alt: "Участники проходят командное испытание в летнем саду" },
+  "komandnyy-blockbuster": { src: "/catalog-covers/komandnyy-blockbuster.webp", alt: "Команда проходит кинематографический маршрут с лазерной сигнализацией" },
+  "neolimpiyskie-igry": { src: "/catalog-covers/neolimpiyskie-igry.webp", alt: "Команды соревнуются в необычной спортивной дисциплине" },
+  "skazochnye-tropy": { src: "/catalog-covers/skazochnye-tropy.webp", alt: "Команда проходит сказочный верёвочный маршрут в лесу" },
+  "stroyka-yarmarka": { src: "/catalog-covers/stroyka-yarmarka.webp", alt: "Участники строят и оформляют ярмарочный корнер" },
+};
+
+function getDisplayMedia(item: CatalogItemRecord): CatalogItemRecord["media"] {
+  if (item.media.length) return item.media;
+  const cover = seededCatalogCovers[item.slug];
+  return cover ? [{ id: `seed-cover-${item.slug}`, storagePath: cover.src, src: cover.src, alt: cover.alt, sortOrder: 0 }] : [];
+}
 
 function formatRange(min: number | null, max: number | null, suffix: string) {
   if (!min && !max) return null;
@@ -37,7 +51,7 @@ function paginationItems(current: number, total: number): Array<number | string>
 }
 
 function CatalogPoster({ item, compact = false }: { item: CatalogItemRecord; compact?: boolean }) {
-  const cover = item.media[0];
+  const cover = getDisplayMedia(item)[0];
   if (cover) return <img src={cover.src} alt={cover.alt} loading="lazy" />;
   return <div className={`catalog-poster catalog-poster--${item.categoryId}`} aria-hidden="true">
     <span>ВАУСТОРГ / {item.kind === "prop" ? "РЕКВИЗИТ" : "РЕШЕНИЕ"}</span>
@@ -113,7 +127,8 @@ function ItemDialog({ item, category, propGroup, onClose }: { item: CatalogItemR
     if (!item && dialog.open) dialog.close();
   }, [item]);
 
-  const mediaCount = item?.media.length ?? 0;
+  const displayMedia = item ? getDisplayMedia(item) : [];
+  const mediaCount = displayMedia.length;
   const showImage = (index: number) => {
     if (mediaCount < 1) return;
     setActiveImage((index + mediaCount) % mediaCount);
@@ -168,17 +183,17 @@ function ItemDialog({ item, category, propGroup, onClose }: { item: CatalogItemR
     <button className="catalog-detail__close" type="button" onClick={onClose} aria-label="Закрыть карточку"><X size={22} /></button>
     <div className="catalog-detail__media">
       <div className="catalog-detail__stage" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
-        {item.media.length ? <button className="catalog-detail__imageButton" type="button" onClick={() => setLightboxOpen(true)} aria-label="Увеличить фотографию">
-          <img src={item.media[activeImage]?.src} alt={item.media[activeImage]?.alt} decoding="async" />
+        {displayMedia.length ? <button className="catalog-detail__imageButton" type="button" onClick={() => setLightboxOpen(true)} aria-label="Увеличить фотографию">
+          <img src={displayMedia[activeImage]?.src} alt={displayMedia[activeImage]?.alt} decoding="async" />
           <span><ZoomIn size={16} /> Увеличить</span>
         </button> : <CatalogPoster item={item} />}
-        {item.media.length > 1 ? <div className="catalog-detail__galleryControls" aria-label="Навигация по фотографиям">
+        {displayMedia.length > 1 ? <div className="catalog-detail__galleryControls" aria-label="Навигация по фотографиям">
           <button type="button" onClick={showPreviousImage} aria-label="Предыдущая фотография"><ChevronLeft size={21} /></button>
-          <span>{activeImage + 1} / {item.media.length}</span>
+          <span>{activeImage + 1} / {displayMedia.length}</span>
           <button type="button" onClick={showNextImage} aria-label="Следующая фотография"><ChevronRight size={21} /></button>
         </div> : null}
       </div>
-      {item.media.length > 1 ? <div className="catalog-detail__thumbs">{item.media.map((media, index) => <button className={index === activeImage ? "is-active" : ""} key={media.id} type="button" aria-label={`Показать фото ${index + 1}`} onClick={() => setActiveImage(index)}><img src={media.src} alt="" /></button>)}</div> : null}
+      {displayMedia.length > 1 ? <div className="catalog-detail__thumbs">{displayMedia.map((media, index) => <button className={index === activeImage ? "is-active" : ""} key={media.id} type="button" aria-label={`Показать фото ${index + 1}`} onClick={() => setActiveImage(index)}><img src={media.src} alt="" /></button>)}</div> : null}
     </div>
     <article className="catalog-detail__copy">
       <span>{propGroup?.title ?? category?.title ?? "Каталог"}</span>
@@ -200,13 +215,13 @@ function ItemDialog({ item, category, propGroup, onClose }: { item: CatalogItemR
         <a href="/#brief">Обсудить задачу <ArrowRight size={18} /></a>
       </div>
     </article>
-    {lightboxOpen && item.media.length ? <div className="catalog-lightbox" role="dialog" aria-modal="true" aria-label={`Фотографии: ${item.title}`} onClick={(event) => {
+    {lightboxOpen && displayMedia.length ? <div className="catalog-lightbox" role="dialog" aria-modal="true" aria-label={`Фотографии: ${item.title}`} onClick={(event) => {
       if (event.currentTarget === event.target) setLightboxOpen(false);
     }} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
       <button className="catalog-lightbox__close" type="button" onClick={() => setLightboxOpen(false)} aria-label="Закрыть увеличенное фото" autoFocus><X size={24} /></button>
-      {item.media.length > 1 ? <button className="catalog-lightbox__arrow catalog-lightbox__arrow--previous" type="button" onClick={showPreviousImage} aria-label="Предыдущая фотография"><ChevronLeft size={28} /></button> : null}
-      <figure><img src={item.media[activeImage]?.src} alt={item.media[activeImage]?.alt} /><figcaption>{activeImage + 1} / {item.media.length}</figcaption></figure>
-      {item.media.length > 1 ? <button className="catalog-lightbox__arrow catalog-lightbox__arrow--next" type="button" onClick={showNextImage} aria-label="Следующая фотография"><ChevronRight size={28} /></button> : null}
+      {displayMedia.length > 1 ? <button className="catalog-lightbox__arrow catalog-lightbox__arrow--previous" type="button" onClick={showPreviousImage} aria-label="Предыдущая фотография"><ChevronLeft size={28} /></button> : null}
+      <figure><img src={displayMedia[activeImage]?.src} alt={displayMedia[activeImage]?.alt} /><figcaption>{activeImage + 1} / {displayMedia.length}</figcaption></figure>
+      {displayMedia.length > 1 ? <button className="catalog-lightbox__arrow catalog-lightbox__arrow--next" type="button" onClick={showNextImage} aria-label="Следующая фотография"><ChevronRight size={28} /></button> : null}
     </div> : null}
   </dialog>;
 }

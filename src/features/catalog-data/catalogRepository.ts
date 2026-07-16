@@ -391,7 +391,7 @@ export async function uploadCatalogPresentation(
     throw updateError;
   }
 
-  if (previousPath && previousPath !== storagePath) {
+  if (previousPath && previousPath !== storagePath && !/^https?:\/\//i.test(previousPath) && !previousPath.startsWith("/")) {
     const { error: removeError } = await supabase.storage.from("site-media").remove([previousPath]);
     if (removeError) throw removeError;
   }
@@ -412,7 +412,9 @@ export async function deleteCatalogPresentation(
     .select("*, catalog_media(id, storage_path, alt_text, sort_order)")
     .single();
   if (updateError) throw updateError;
-  const { error: storageError } = await supabase.storage.from("site-media").remove([storagePath]);
-  if (storageError) throw storageError;
+  if (!/^https?:\/\//i.test(storagePath) && !storagePath.startsWith("/")) {
+    const { error: storageError } = await supabase.storage.from("site-media").remove([storagePath]);
+    if (storageError) throw storageError;
+  }
   return mapItem(data as CatalogItemRow);
 }
