@@ -5008,8 +5008,29 @@ html.has-open-dialog body {
 }
 
 .catalog-poster--props {
+  justify-content: flex-end;
   background: #2f2362;
   color: #f3f1eb;
+}
+
+.catalog-card--prop .catalog-poster--props > span {
+  position: absolute;
+  top: 20px;
+  right: 22px;
+  max-width: calc(100% - 76px);
+  text-align: right;
+}
+
+.catalog-card--prop .catalog-poster--props > small {
+  display: none;
+}
+
+.catalog-card--prop .catalog-poster--props > strong {
+  max-width: 94%;
+  margin-bottom: 2px;
+  font-size: clamp(1.65rem, 2.15vw, 2.75rem);
+  line-height: 0.92;
+  rotate: -2deg;
 }
 
 .catalog-poster span,
@@ -5249,6 +5270,10 @@ html.has-open-dialog body {
 
 .catalog-detail__stage > .catalog-poster strong {
   font-size: clamp(4rem, 8vw, 8rem);
+}
+
+.catalog-detail__stage > .catalog-poster--props strong {
+  font-size: clamp(2.75rem, 5vw, 5.25rem);
 }
 
 .catalog-detail__imageButton > span {
