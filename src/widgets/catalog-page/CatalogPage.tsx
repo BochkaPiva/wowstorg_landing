@@ -13,20 +13,6 @@ import { siteConfig } from "@shared/config/site";
 
 const sectionOrder: CatalogCategory["id"][] = ["teambuilding", "welcome", "game_zone", "props"];
 const propsPageSize = 30;
-const seededCatalogCovers: Record<string, { src: string; alt: string }> = {
-  "komandnyy-konstruktor": { src: "/catalog-covers/komandnyy-konstruktor.webp", alt: "Команда строит общий город из блочного конструктора" },
-  "bolshoy-dachnyy-sezon": { src: "/catalog-covers/bolshoy-dachnyy-sezon.webp", alt: "Участники проходят командное испытание в летнем саду" },
-  "komandnyy-blockbuster": { src: "/catalog-covers/komandnyy-blockbuster.webp", alt: "Команда проходит кинематографический маршрут с лазерной сигнализацией" },
-  "neolimpiyskie-igry": { src: "/catalog-covers/neolimpiyskie-igry.webp", alt: "Команды соревнуются в необычной спортивной дисциплине" },
-  "skazochnye-tropy": { src: "/catalog-covers/skazochnye-tropy.webp", alt: "Команда проходит сказочный верёвочный маршрут в лесу" },
-  "stroyka-yarmarka": { src: "/catalog-covers/stroyka-yarmarka.webp", alt: "Участники строят и оформляют ярмарочный корнер" },
-};
-
-function getDisplayMedia(item: CatalogItemRecord): CatalogItemRecord["media"] {
-  if (item.media.length) return item.media;
-  const cover = seededCatalogCovers[item.slug];
-  return cover ? [{ id: `seed-cover-${item.slug}`, storagePath: cover.src, src: cover.src, alt: cover.alt, sortOrder: 0 }] : [];
-}
 
 function formatRange(min: number | null, max: number | null, suffix: string) {
   if (!min && !max) return null;
@@ -51,7 +37,7 @@ function paginationItems(current: number, total: number): Array<number | string>
 }
 
 function CatalogPoster({ item, compact = false }: { item: CatalogItemRecord; compact?: boolean }) {
-  const cover = getDisplayMedia(item)[0];
+  const cover = item.media[0];
   if (cover) return <img src={cover.src} alt={cover.alt} loading="lazy" />;
   return <div className={`catalog-poster catalog-poster--${item.categoryId}`} aria-hidden="true">
     <span>ВАУСТОРГ / {item.kind === "prop" ? "РЕКВИЗИТ" : "РЕШЕНИЕ"}</span>
@@ -127,7 +113,7 @@ function ItemDialog({ item, category, propGroup, onClose }: { item: CatalogItemR
     if (!item && dialog.open) dialog.close();
   }, [item]);
 
-  const displayMedia = item ? getDisplayMedia(item) : [];
+  const displayMedia = item?.media ?? [];
   const mediaCount = displayMedia.length;
   const showImage = (index: number) => {
     if (mediaCount < 1) return;

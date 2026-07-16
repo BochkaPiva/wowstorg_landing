@@ -14,6 +14,16 @@ export type CatalogMediaRecord = {
   src: string;
   alt: string;
   sortOrder: number;
+  isSeeded?: boolean;
+};
+
+const seededCatalogCovers: Record<string, { src: string; alt: string }> = {
+  "komandnyy-konstruktor": { src: "/catalog-covers/komandnyy-konstruktor.webp", alt: "Команда строит общий город из блочного конструктора" },
+  "bolshoy-dachnyy-sezon": { src: "/catalog-covers/bolshoy-dachnyy-sezon.webp", alt: "Участники проходят командное испытание в летнем саду" },
+  "komandnyy-blockbuster": { src: "/catalog-covers/komandnyy-blockbuster.webp", alt: "Команда проходит кинематографический маршрут с лазерной сигнализацией" },
+  "neolimpiyskie-igry": { src: "/catalog-covers/neolimpiyskie-igry.webp", alt: "Команды соревнуются в необычной спортивной дисциплине" },
+  "skazochnye-tropy": { src: "/catalog-covers/skazochnye-tropy.webp", alt: "Команда проходит сказочный верёвочный маршрут в лесу" },
+  "stroyka-yarmarka": { src: "/catalog-covers/stroyka-yarmarka.webp", alt: "Команда собирает ярмарочный корнер из бруса, ОСБ и картона" },
 };
 
 export type CatalogPropGroup = {
@@ -86,6 +96,15 @@ type CatalogItemRow = {
 };
 
 function mapItem(row: CatalogItemRow): CatalogItemRecord {
+  const storedMedia = (row.catalog_media ?? []).sort((a, b) => a.sort_order - b.sort_order).map((media) => ({
+    id: media.id,
+    storagePath: media.storage_path,
+    src: getPublicMediaUrl(media.storage_path),
+    alt: media.alt_text,
+    sortOrder: media.sort_order,
+  }));
+  const seededCover = seededCatalogCovers[row.slug];
+
   return {
     id: row.id,
     categoryId: row.category_id,
@@ -114,13 +133,14 @@ function mapItem(row: CatalogItemRow): CatalogItemRecord {
     isFeatured: row.is_featured,
     sortOrder: row.sort_order,
     updatedAt: row.updated_at,
-    media: (row.catalog_media ?? []).sort((a, b) => a.sort_order - b.sort_order).map((media) => ({
-      id: media.id,
-      storagePath: media.storage_path,
-      src: getPublicMediaUrl(media.storage_path),
-      alt: media.alt_text,
-      sortOrder: media.sort_order,
-    })),
+    media: storedMedia.length || !seededCover ? storedMedia : [{
+      id: `seed-cover-${row.slug}`,
+      storagePath: seededCover.src,
+      src: seededCover.src,
+      alt: seededCover.alt,
+      sortOrder: 0,
+      isSeeded: true,
+    }],
   };
 }
 
@@ -343,6 +363,7 @@ export async function uploadCatalogImages(
 }
 
 export async function deleteCatalogImage(media: CatalogMediaRecord) {
+  if (media.isSeeded) throw new Error("Встроенную обложку нельзя удалить. Загрузите новую фотографию, чтобы заменить её.");
   const client = requireSupabase();
   const { error } = await client.from("catalog_media").delete().eq("id", media.id);
   if (error) throw error;

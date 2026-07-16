@@ -1988,6 +1988,19 @@
   font-weight: 700;
 }
 
+.admin-mediaGrid__hint {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-top: 1px solid var(--admin-line);
+  background: #fff8d6;
+  color: #5f4a00;
+  font-size: 0.62rem;
+  font-weight: 700;
+}
+
 .admin-listState {
   display: grid;
   min-height: 180px;

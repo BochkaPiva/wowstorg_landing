@@ -85,6 +85,7 @@ function openFilePickerFromKeyboard(event: ReactKeyboardEvent<HTMLLabelElement>)
 export function CatalogManager() {
   const { user, profile } = useAdminAuth();
   const titleInputRef = useRef<HTMLInputElement | null>(null);
+  const nextMediaSortOrderRef = useRef(0);
   const [categories, setCategories] = useState<CatalogCategory[]>([]);
   const [items, setItems] = useState<CatalogItemRecord[]>([]);
   const [propGroups, setPropGroups] = useState<CatalogPropGroup[]>([]);
@@ -104,6 +105,7 @@ export function CatalogManager() {
   const [error, setError] = useState<string | null>(null);
 
   const selected = items.find((item) => item.id === selectedId) ?? null;
+  const hasSeededCover = Boolean(selected?.media[0]?.isSeeded);
   const canEdit = profile?.role !== "viewer";
   const canDeleteMedia = profile?.role === "owner" || profile?.role === "admin";
   const updatePropGroups = (nextGroups: CatalogPropGroup[]) => {
@@ -149,6 +151,7 @@ export function CatalogManager() {
 
   const select = (item: CatalogItemRecord) => {
     resetPendingImages();
+    nextMediaSortOrderRef.current = item.media.reduce((next, media) => media.isSeeded ? next : Math.max(next, media.sortOrder + 1), 0);
     setSelectedId(item.id);
     const { id: _id, updatedAt: _updatedAt, media: _media, presentationUrl: _presentationUrl, ...input } = item;
     setDraft(input);
@@ -324,8 +327,11 @@ export function CatalogManager() {
 
   const upload = async (file: File, alt: string) => {
     if (!selectedId) throw new Error("Сначала сохраните карточку.");
-    const media = await uploadCatalogImage(selectedId, file, alt, selected?.media.length ?? 0);
-    setItems((current) => current.map((item) => item.id === selectedId ? { ...item, media: [...item.media, media] } : item));
+    const media = await uploadCatalogImage(selectedId, file, alt, nextMediaSortOrderRef.current);
+    nextMediaSortOrderRef.current = media.sortOrder + 1;
+    setItems((current) => current.map((item) => item.id === selectedId
+      ? { ...item, media: [...item.media.filter((currentMedia) => !currentMedia.isSeeded), media] }
+      : item));
   };
 
   const syncSelectedItem = (item: CatalogItemRecord) => {
@@ -459,7 +465,7 @@ export function CatalogManager() {
         </div> : <label className={uploadingPresentation ? "admin-presentationUpload is-disabled" : "admin-presentationUpload"} role="button" tabIndex={!canEdit || uploadingPresentation ? -1 : 0} aria-disabled={!canEdit || uploadingPresentation} onKeyDown={openFilePickerFromKeyboard}>{uploadingPresentation ? <LoaderCircle className="is-spinning" size={20} /> : <Upload size={20} />}<span><strong>{uploadingPresentation ? "Загружаем…" : "Выбрать PDF"}</strong><small>Презентация появится в клиентском каталоге</small></span><input type="file" accept="application/pdf,.pdf" disabled={!canEdit || uploadingPresentation} onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadPresentation(file); event.currentTarget.value = ""; }} /></label>}
       </section> : null}
 
-      <section className="admin-mediaSection"><header><div><h3>Фотографии</h3><p>Можно выбрать сразу несколько файлов. Первое изображение станет обложкой, остальные появятся в галерее карточки.</p></div></header><MediaUploader multiple onUpload={upload} onPendingChange={(files, alt) => setPendingImages({ files, alt })} deferred={!selectedId} resetToken={mediaResetToken} suggestedAlt={draft.title} label={selectedId ? "Добавить фотографии" : "Выбрать фотографии"} /><div className="admin-mediaGrid">{selected?.media.map((media, index) => <figure key={media.id}><span className="admin-mediaGrid__index">{index === 0 ? "Обложка" : `Фото ${index + 1}`}</span><img src={media.src} alt={media.alt} /><figcaption>{media.alt}</figcaption>{canDeleteMedia ? <button type="button" onClick={() => void deleteCatalogImage(media).then(load)}><Archive size={15} /> Удалить</button> : null}</figure>)}</div></section>
+      <section className="admin-mediaSection"><header><div><h3>Фотографии</h3><p>{hasSeededCover ? "Сейчас используется встроенная обложка. Первая загруженная фотография заменит её и станет доступна для обычного управления." : "Можно выбрать сразу несколько файлов. Первое изображение станет обложкой, остальные появятся в галерее карточки."}</p></div></header><MediaUploader multiple onUpload={upload} onPendingChange={(files, alt) => setPendingImages({ files, alt })} deferred={!selectedId} resetToken={mediaResetToken} suggestedAlt={draft.title} label={!selectedId ? "Выбрать фотографии" : hasSeededCover ? "Заменить обложку" : "Добавить фотографии"} /><div className="admin-mediaGrid">{selected?.media.map((media, index) => <figure key={media.id}><span className="admin-mediaGrid__index">{index === 0 ? "Обложка" : `Фото ${index + 1}`}</span><img src={media.src} alt={media.alt} /><figcaption>{media.alt}{media.isSeeded ? " · встроенная" : ""}</figcaption>{media.isSeeded ? <span className="admin-mediaGrid__hint"><Upload size={15} /> Заменится после загрузки</span> : canDeleteMedia ? <button type="button" onClick={() => void deleteCatalogImage(media).then(load)}><Archive size={15} /> Удалить</button> : null}</figure>)}</div></section>
     </section>
   </div>;
 }
