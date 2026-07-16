@@ -6182,9 +6182,6 @@ html.has-open-dialog body {
 }
 
 .catalog-page__propFilters {
-  position: sticky;
-  z-index: 8;
-  top: 70px;
   display: flex;
   min-width: 0;
   align-items: center;
@@ -6192,9 +6189,7 @@ html.has-open-dialog body {
   gap: 18px;
   border-bottom: 1px solid rgb(10 10 10 / 0.14);
   padding: 14px 0;
-  background: rgb(244 244 240 / 0.96);
-  backdrop-filter: blur(10px);
-  scroll-margin-top: 82px;
+  background: #f4f4f0;
 }
 
 .catalog-page__propFilters > div {
@@ -6388,7 +6383,6 @@ html.has-open-dialog body {
 
 @media (max-width: 720px) {
   .catalog-page__propFilters {
-    top: 68px;
     margin-inline: -18px;
     padding-inline: 18px;
   }
