@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight, Clock3, Minus, Plus, Search, ShoppingBag, Users, X, ZoomIn } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight, Clock3, ExternalLink, FileText, Minus, Plus, Search, ShoppingBag, Users, X, ZoomIn } from "lucide-react";
 import { type TouchEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useCatalogCart } from "@features/catalog-cart/CatalogCartContext";
 import {
@@ -143,6 +143,7 @@ function ItemDialog({ item, category, onClose }: { item: CatalogItemRecord | nul
       </div>
       {item.effectStatement ? <blockquote>{item.effectStatement}</blockquote> : null}
       <p>{item.description}</p>
+      {item.kind !== "prop" && item.presentationUrl ? <a className="catalog-detail__presentation" href={item.presentationUrl} target="_blank" rel="noreferrer"><FileText size={23} /><span><strong>Смотреть презентацию</strong><small>{item.presentationName || "PDF-презентация"}</small></span><ExternalLink size={18} /></a> : null}
       {item.includedItems.length ? <section><h3>В составе</h3><ul>{item.includedItems.map((value) => <li key={value}><Check size={16} />{value}</li>)}</ul></section> : null}
       {item.requirements.length ? <section><h3>Что учесть</h3><ul>{item.requirements.map((value) => <li key={value}>{value}</li>)}</ul></section> : null}
       <div className="catalog-detail__actions">

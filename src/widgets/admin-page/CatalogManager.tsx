@@ -1,8 +1,9 @@
-import { Archive, Check, ChevronRight, ImageIcon, LoaderCircle, Plus, RotateCcw, Save, Search } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Archive, Check, ChevronRight, ExternalLink, FileText, ImageIcon, LoaderCircle, Plus, RotateCcw, Save, Search, Trash2, Upload } from "lucide-react";
+import { type KeyboardEvent as ReactKeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useAdminAuth } from "@features/admin-auth/AdminAuthContext";
 import {
   deleteCatalogImage,
+  deleteCatalogPresentation,
   listCatalogCategories,
   listCatalogItems,
   saveCatalogItem,
@@ -10,6 +11,7 @@ import {
   type CatalogItemInput,
   type CatalogItemRecord,
   uploadCatalogImage,
+  uploadCatalogPresentation,
 } from "@features/catalog-data/catalogRepository";
 import { MediaUploader } from "./MediaUploader";
 
@@ -22,8 +24,10 @@ const emptyItem = (categoryId: CatalogCategory["id"] = "teambuilding"): CatalogI
   description: "",
   effectStatement: "",
   priceFrom: null,
-  priceUnit: null,
+  priceUnit: categoryId === "props" ? "в сутки" : null,
   stockQuantity: null,
+  presentationPath: null,
+  presentationName: null,
   guestMin: null,
   guestMax: null,
   durationMin: null,
@@ -40,6 +44,15 @@ const emptyItem = (categoryId: CatalogCategory["id"] = "teambuilding"): CatalogI
 const transliterate = (value: string) => value.toLocaleLowerCase("ru")
   .replace(/[а-яё]/g, (letter) => ({ а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", ё: "e", ж: "zh", з: "z", и: "i", й: "y", к: "k", л: "l", м: "m", н: "n", о: "o", п: "p", р: "r", с: "s", т: "t", у: "u", ф: "f", х: "h", ц: "c", ч: "ch", ш: "sh", щ: "sch", ъ: "", ы: "y", ь: "", э: "e", ю: "yu", я: "ya" }[letter] ?? letter))
   .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 80);
+
+const makeUniqueSlug = (title: string, items: CatalogItemRecord[], selectedId: string | null) => {
+  const base = transliterate(title) || `item-${Date.now()}`;
+  const occupied = new Set(items.filter((item) => item.id !== selectedId).map((item) => item.slug));
+  if (!occupied.has(base)) return base;
+  let suffix = 2;
+  while (occupied.has(`${base}-${suffix}`)) suffix += 1;
+  return `${base}-${suffix}`;
+};
 
 const kindLabels: Record<CatalogItemRecord["kind"], string> = {
   package: "Программа",
@@ -58,8 +71,15 @@ function TextList({ label, values, onChange }: { label: string; values: string[]
   return <label className="admin-field"><span>{label}</span><textarea rows={3} value={values.join("\n")} onChange={(event) => onChange(event.target.value.split("\n"))} /><small>Каждый пункт с новой строки</small></label>;
 }
 
+function openFilePickerFromKeyboard(event: ReactKeyboardEvent<HTMLLabelElement>) {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  event.preventDefault();
+  event.currentTarget.querySelector<HTMLInputElement>('input[type="file"]')?.click();
+}
+
 export function CatalogManager() {
   const { user, profile } = useAdminAuth();
+  const titleInputRef = useRef<HTMLInputElement | null>(null);
   const [categories, setCategories] = useState<CatalogCategory[]>([]);
   const [items, setItems] = useState<CatalogItemRecord[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -70,6 +90,7 @@ export function CatalogManager() {
   const [statusFilter, setStatusFilter] = useState<"all" | CatalogItemRecord["status"]>("all");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingPresentation, setUploadingPresentation] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -106,16 +127,31 @@ export function CatalogManager() {
 
   const select = (item: CatalogItemRecord) => {
     setSelectedId(item.id);
-    const { id: _id, updatedAt: _updatedAt, media: _media, ...input } = item;
+    const { id: _id, updatedAt: _updatedAt, media: _media, presentationUrl: _presentationUrl, ...input } = item;
     setDraft(input);
     setMessage(null);
     setError(null);
   };
-  const create = () => { setSelectedId(null); setDraft(emptyItem(categories[0]?.id)); setMessage(null); setError(null); };
+  const create = () => {
+    const categoryId = categoryFilter === "all" ? categories[0]?.id : categoryFilter;
+    setSelectedId(null);
+    setDraft(emptyItem(categoryId));
+    setMessage(null);
+    setError(null);
+    requestAnimationFrame(() => titleInputRef.current?.focus());
+  };
   const update = <K extends keyof CatalogItemInput>(key: K, value: CatalogItemInput[K]) => setDraft((current) => ({ ...current, [key]: value }));
   const changeCategory = (categoryId: CatalogCategory["id"]) => setDraft((current) => {
     if (categoryId === "props") {
-      return { ...current, categoryId, kind: "prop", leadIntent: "rent", priceUnit: current.kind === "prop" ? current.priceUnit : "за штуку / сутки" };
+      return {
+        ...current,
+        categoryId,
+        kind: "prop",
+        leadIntent: "rent",
+        priceUnit: "в сутки",
+        presentationPath: null,
+        presentationName: null,
+      };
     }
     if (current.kind === "prop") {
       return {
@@ -130,7 +166,15 @@ export function CatalogManager() {
   });
   const changeKind = (kind: CatalogItemRecord["kind"]) => setDraft((current) => {
     if (kind === "prop") {
-      return { ...current, kind, categoryId: "props", leadIntent: "rent", priceUnit: current.priceUnit || "за штуку / сутки" };
+      return {
+        ...current,
+        kind,
+        categoryId: "props",
+        leadIntent: "rent",
+        priceUnit: "в сутки",
+        presentationPath: null,
+        presentationName: null,
+      };
     }
     const categoryId = current.categoryId === "props"
       ? kind === "package" ? "teambuilding" : kind === "zone" ? "game_zone" : "welcome"
@@ -150,7 +194,7 @@ export function CatalogManager() {
   const editorProfile = isProp
     ? {
         title: "Карточка реквизита",
-        description: "Укажите единичную цену и доступное количество. Параметры гостей и длительности здесь не используются.",
+        description: "Достаточно названия, цены и количества. Адрес создаётся автоматически, цена всегда указана за сутки.",
       }
     : draft.kind === "package"
       ? {
@@ -167,18 +211,14 @@ export function CatalogManager() {
             description: "Опишите результат услуги и длительность, если она заранее определена.",
           };
 
-  const save = async () => {
+  const save = async (createNext = false) => {
     if (!user || !canEdit) return;
-    const slug = draft.slug || transliterate(draft.title);
+    const slug = selectedId && draft.slug ? draft.slug : makeUniqueSlug(draft.title, items, selectedId);
     if (draft.title.trim().length < 2) {
       setError("Добавьте понятное название карточки.");
       return;
     }
-    if (slug.length < 2) {
-      setError("Не удалось сформировать адрес карточки. Укажите его вручную латиницей.");
-      return;
-    }
-    if (draft.shortDescription.trim().length < 10) {
+    if (!isProp && draft.shortDescription.trim().length < 10) {
       setError("Короткое описание должно объяснять предложение хотя бы одним предложением.");
       return;
     }
@@ -189,8 +229,15 @@ export function CatalogManager() {
       const normalized = {
         ...draft,
         slug,
+        shortDescription: normalizedIsProp && draft.shortDescription.trim().length < 10
+          ? `Аренда реквизита «${draft.title.trim()}» для мероприятий.`
+          : draft.shortDescription.trim(),
         effectStatement: normalizedIsProp ? "" : draft.effectStatement.trim(),
+        priceUnit: normalizedIsProp ? "в сутки" : draft.priceUnit,
+        leadIntent: normalizedIsProp ? "rent" as const : draft.leadIntent,
         stockQuantity: normalizedIsProp ? draft.stockQuantity : null,
+        presentationPath: normalizedIsProp ? null : draft.presentationPath,
+        presentationName: normalizedIsProp ? null : draft.presentationName,
         guestMin: normalizedSupportsGuests ? draft.guestMin : null,
         guestMax: normalizedSupportsGuests ? draft.guestMax : null,
         durationMin: normalizedIsProp ? null : draft.durationMin,
@@ -201,10 +248,19 @@ export function CatalogManager() {
       };
       const saved = await saveCatalogItem(selectedId, normalized, user.id);
       setItems((current) => selectedId ? current.map((item) => item.id === saved.id ? saved : item) : [saved, ...current]);
-      setSelectedId(saved.id);
-      const { id: _id, updatedAt: _updatedAt, media: _media, ...input } = saved;
-      setDraft(input);
-      setMessage(saved.status === "published" ? "Карточка сохранена и видна в каталоге." : "Черновик сохранён.");
+      if (createNext && normalizedIsProp) {
+        const next = emptyItem("props");
+        next.status = saved.status;
+        setSelectedId(null);
+        setDraft(next);
+        setMessage("Реквизит сохранён. Можно сразу добавить следующую позицию.");
+        requestAnimationFrame(() => titleInputRef.current?.focus());
+      } else {
+        setSelectedId(saved.id);
+        const { id: _id, updatedAt: _updatedAt, media: _media, presentationUrl: _presentationUrl, ...input } = saved;
+        setDraft(input);
+        setMessage(saved.status === "published" ? "Карточка сохранена и видна в каталоге." : "Черновик сохранён.");
+      }
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Не удалось сохранить карточку."); }
     finally { setSaving(false); }
   };
@@ -213,6 +269,50 @@ export function CatalogManager() {
     if (!selectedId) throw new Error("Сначала сохраните карточку.");
     const media = await uploadCatalogImage(selectedId, file, alt, selected?.media.length ?? 0);
     setItems((current) => current.map((item) => item.id === selectedId ? { ...item, media: [...item.media, media] } : item));
+  };
+
+  const syncSelectedItem = (item: CatalogItemRecord) => {
+    setItems((current) => current.map((currentItem) => currentItem.id === item.id ? item : currentItem));
+    setDraft((current) => ({
+      ...current,
+      presentationPath: item.presentationPath,
+      presentationName: item.presentationName,
+    }));
+  };
+
+  const uploadPresentation = async (file: File) => {
+    if (!selectedId || !user) {
+      setError("Сначала сохраните карточку, затем загрузите презентацию.");
+      return;
+    }
+    setUploadingPresentation(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const saved = await uploadCatalogPresentation(selectedId, file, user.id, selected?.presentationPath);
+      syncSelectedItem(saved);
+      setMessage("PDF-презентация загружена и доступна клиентам.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Не удалось загрузить презентацию.");
+    } finally {
+      setUploadingPresentation(false);
+    }
+  };
+
+  const removePresentation = async () => {
+    if (!selectedId || !selected?.presentationPath || !user || !canDeleteMedia) return;
+    setUploadingPresentation(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const saved = await deleteCatalogPresentation(selectedId, selected.presentationPath, user.id);
+      syncSelectedItem(saved);
+      setMessage("PDF-презентация удалена.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Не удалось удалить презентацию.");
+    } finally {
+      setUploadingPresentation(false);
+    }
   };
 
   return <div className="admin-manager">
@@ -262,29 +362,43 @@ export function CatalogManager() {
     </aside>
 
     <section className="admin-manager__editor">
-      <header><div><span>{selectedId ? "Карточка каталога" : "Новая карточка"}</span><h2>{draft.title || "Без названия"}</h2></div><div><select value={draft.status} disabled={!canEdit} onChange={(event) => update("status", event.target.value as CatalogItemInput["status"])}><option value="draft">Черновик</option><option value="published">Опубликовано</option><option value="archived">Архив</option></select><button type="button" onClick={() => void save()} disabled={!canEdit || saving}>{saving ? <LoaderCircle className="is-spinning" size={17} /> : <Save size={17} />} Сохранить</button></div></header>
+      <header><div><span>{selectedId ? "Карточка каталога" : "Новая карточка"}</span><h2>{draft.title || "Без названия"}</h2></div><div><select value={draft.status} disabled={!canEdit} onChange={(event) => update("status", event.target.value as CatalogItemInput["status"])}><option value="draft">Черновик</option><option value="published">Опубликовано</option><option value="archived">Архив</option></select><button type="button" onClick={() => void save()} disabled={!canEdit || saving}>{saving ? <LoaderCircle className="is-spinning" size={17} /> : <Save size={17} />} Сохранить</button>{isProp ? <button className="is-secondary" type="button" onClick={() => void save(true)} disabled={!canEdit || saving}><Plus size={17} /> Сохранить и следующий</button> : null}</div></header>
       {message ? <p className="admin-successMessage"><Check size={16} />{message}</p> : null}{error ? <p className="admin-formError" role="alert">{error}</p> : null}
       <div className="admin-editorGrid">
-        <label className="admin-field"><span>Название</span><input value={draft.title} onChange={(event) => update("title", event.target.value)} /></label>
-        <label className="admin-field"><span>Адрес карточки</span><input value={draft.slug} placeholder="Заполнится автоматически" onChange={(event) => update("slug", transliterate(event.target.value))} /></label>
+        <label className="admin-field"><span>Название</span><input ref={titleInputRef} value={draft.title} onChange={(event) => update("title", event.target.value)} /></label>
         <label className="admin-field"><span>Раздел</span><select value={draft.categoryId} onChange={(event) => changeCategory(event.target.value as CatalogCategory["id"])}>{categories.map((category) => <option key={category.id} value={category.id}>{category.title}</option>)}</select></label>
-        <label className="admin-field"><span>Тип</span><select value={draft.kind} onChange={(event) => changeKind(event.target.value as CatalogItemInput["kind"])}>{Object.entries(kindLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+        {!isProp ? <label className="admin-field"><span>Тип</span><select value={draft.kind} onChange={(event) => changeKind(event.target.value as CatalogItemInput["kind"])}>{Object.entries(kindLabels).filter(([value]) => value !== "prop").map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label> : null}
         <div className="admin-typeNote admin-field--wide"><strong>{editorProfile.title}</strong><span>{editorProfile.description}</span></div>
         <label className="admin-field"><span>{isProp ? "Цена за единицу" : "Цена от"}</span><input type="number" min="0" step={isProp ? 1 : 100} value={draft.priceFrom ?? ""} placeholder="Не указывать" onChange={(event) => update("priceFrom", event.target.value ? Number(event.target.value) : null)} /></label>
-        <label className="admin-field"><span>Единица цены</span><input value={draft.priceUnit ?? ""} placeholder={isProp ? "за штуку / в сутки" : "за программу / в сутки"} onChange={(event) => update("priceUnit", event.target.value || null)} /></label>
+        {!isProp ? <label className="admin-field"><span>Единица цены</span><input value={draft.priceUnit ?? ""} placeholder="за программу / в сутки" onChange={(event) => update("priceUnit", event.target.value || null)} /></label> : null}
         {isProp ? <label className="admin-field"><span>Количество в наличии</span><input type="number" min="0" step="1" value={draft.stockQuantity ?? ""} placeholder="Не отслеживать" onChange={(event) => update("stockQuantity", event.target.value === "" ? null : Number(event.target.value))} /><small>Оставьте пустым, если остаток не ведётся.</small></label> : null}
-        <label className="admin-field"><span>Действие в заявке</span><select value={draft.leadIntent} onChange={(event) => update("leadIntent", event.target.value as CatalogItemInput["leadIntent"])}><option value="selection">Добавить в подборку</option><option value="estimate">Запросить расчёт</option><option value="rent">Запросить аренду</option><option value="consultation">Обсудить с менеджером</option></select></label>
-        <label className="admin-field admin-field--wide"><span>Короткое описание</span><textarea rows={3} maxLength={320} value={draft.shortDescription} onChange={(event) => update("shortDescription", event.target.value)} /></label>
-        <label className="admin-field admin-field--wide"><span>Полное описание</span><textarea rows={6} maxLength={8000} value={draft.description} onChange={(event) => update("description", event.target.value)} /></label>
+        {!isProp ? <label className="admin-field"><span>Действие в заявке</span><select value={draft.leadIntent} onChange={(event) => update("leadIntent", event.target.value as CatalogItemInput["leadIntent"])}><option value="selection">Добавить в подборку</option><option value="estimate">Запросить расчёт</option><option value="rent">Запросить аренду</option><option value="consultation">Обсудить с менеджером</option></select></label> : null}
+        {!isProp ? <><label className="admin-field admin-field--wide"><span>Короткое описание</span><textarea rows={3} maxLength={320} value={draft.shortDescription} onChange={(event) => update("shortDescription", event.target.value)} /></label>
+        <label className="admin-field admin-field--wide"><span>Полное описание</span><textarea rows={6} maxLength={8000} value={draft.description} onChange={(event) => update("description", event.target.value)} /></label></> : null}
         {!isProp ? <label className="admin-field admin-field--wide"><span>Главный эффект</span><textarea rows={2} maxLength={500} value={draft.effectStatement} onChange={(event) => update("effectStatement", event.target.value)} /></label> : null}
         {supportsGuests ? <><label className="admin-field"><span>Гостей от</span><input type="number" min="1" value={draft.guestMin ?? ""} onChange={(event) => update("guestMin", event.target.value ? Number(event.target.value) : null)} /></label><label className="admin-field"><span>Гостей до</span><input type="number" min="1" value={draft.guestMax ?? ""} onChange={(event) => update("guestMax", event.target.value ? Number(event.target.value) : null)} /></label></> : null}
         {supportsDuration ? <><label className="admin-field"><span>Минут от</span><input type="number" min="1" value={draft.durationMin ?? ""} onChange={(event) => update("durationMin", event.target.value ? Number(event.target.value) : null)} /></label><label className="admin-field"><span>Минут до</span><input type="number" min="1" value={draft.durationMax ?? ""} onChange={(event) => update("durationMax", event.target.value ? Number(event.target.value) : null)} /></label></> : null}
         {!isProp ? <TextList label="В составе" values={draft.includedItems} onChange={(value) => update("includedItems", value)} /> : null}
-        <TextList label={isProp ? "Условия аренды" : "Требования"} values={draft.requirements} onChange={(value) => update("requirements", value)} />
+        {!isProp ? <><TextList label="Требования" values={draft.requirements} onChange={(value) => update("requirements", value)} />
         <TextList label="Метки" values={draft.badges} onChange={(value) => update("badges", value)} />
         <label className="admin-field"><span>Порядок</span><input type="number" value={draft.sortOrder} onChange={(event) => update("sortOrder", Number(event.target.value))} /></label>
-        <label className="admin-checkField"><input type="checkbox" checked={draft.isFeatured} onChange={(event) => update("isFeatured", event.target.checked)} /><span>Показывать выше остальных</span></label>
+        <label className="admin-checkField"><input type="checkbox" checked={draft.isFeatured} onChange={(event) => update("isFeatured", event.target.checked)} /><span>Показывать выше остальных</span></label></> : <details className="admin-optionalFields admin-field--wide"><summary>Дополнительные поля</summary><div className="admin-optionalFields__grid">
+          <label className="admin-field admin-field--wide"><span>Короткое описание</span><textarea rows={3} maxLength={320} placeholder="Если оставить пустым, текст создастся автоматически" value={draft.shortDescription} onChange={(event) => update("shortDescription", event.target.value)} /></label>
+          <label className="admin-field admin-field--wide"><span>Полное описание</span><textarea rows={5} maxLength={8000} value={draft.description} onChange={(event) => update("description", event.target.value)} /></label>
+          <TextList label="Условия аренды" values={draft.requirements} onChange={(value) => update("requirements", value)} />
+          <TextList label="Метки" values={draft.badges} onChange={(value) => update("badges", value)} />
+          <label className="admin-field"><span>Порядок</span><input type="number" value={draft.sortOrder} onChange={(event) => update("sortOrder", Number(event.target.value))} /></label>
+          <label className="admin-checkField"><input type="checkbox" checked={draft.isFeatured} onChange={(event) => update("isFeatured", event.target.checked)} /><span>Показывать выше остальных</span></label>
+        </div></details>}
       </div>
+
+      {!isProp ? <section className="admin-mediaSection admin-presentationSection">
+        <header><div><h3>PDF-презентация</h3><p>Один файл до 30 МБ. В опубликованной карточке клиент сможет открыть его в браузере.</p></div></header>
+        {!selectedId ? <p className="admin-inlineNotice">Сохраните карточку, чтобы загрузить презентацию.</p> : selected?.presentationUrl ? <div className="admin-presentationFile">
+          <a href={selected.presentationUrl} target="_blank" rel="noreferrer"><FileText size={22} /><span><strong>{selected.presentationName || "Презентация.pdf"}</strong><small>Открыть PDF</small></span><ExternalLink size={16} /></a>
+          {canDeleteMedia ? <div className="admin-presentationFile__actions"><label className={uploadingPresentation ? "is-disabled" : ""} role="button" tabIndex={uploadingPresentation ? -1 : 0} aria-disabled={uploadingPresentation} onKeyDown={openFilePickerFromKeyboard}><Upload size={15} /> Заменить<input type="file" accept="application/pdf,.pdf" disabled={uploadingPresentation} onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadPresentation(file); event.currentTarget.value = ""; }} /></label><button type="button" disabled={uploadingPresentation} onClick={() => void removePresentation()}><Trash2 size={15} /> Удалить</button></div> : null}
+        </div> : <label className={uploadingPresentation ? "admin-presentationUpload is-disabled" : "admin-presentationUpload"} role="button" tabIndex={!canEdit || uploadingPresentation ? -1 : 0} aria-disabled={!canEdit || uploadingPresentation} onKeyDown={openFilePickerFromKeyboard}>{uploadingPresentation ? <LoaderCircle className="is-spinning" size={20} /> : <Upload size={20} />}<span><strong>{uploadingPresentation ? "Загружаем…" : "Выбрать PDF"}</strong><small>Презентация появится в клиентском каталоге</small></span><input type="file" accept="application/pdf,.pdf" disabled={!canEdit || uploadingPresentation} onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadPresentation(file); event.currentTarget.value = ""; }} /></label>}
+      </section> : null}
 
       <section className="admin-mediaSection"><header><div><h3>Фотографии</h3><p>Можно выбрать сразу несколько файлов. Первое изображение станет обложкой, остальные появятся в галерее карточки.</p></div></header>{selectedId ? <MediaUploader multiple onUpload={upload} label="Добавить фотографии" /> : <p className="admin-inlineNotice">Сохраните карточку, чтобы загрузить изображения.</p>}<div className="admin-mediaGrid">{selected?.media.map((media, index) => <figure key={media.id}><span className="admin-mediaGrid__index">{index === 0 ? "Обложка" : `Фото ${index + 1}`}</span><img src={media.src} alt={media.alt} /><figcaption>{media.alt}</figcaption>{canDeleteMedia ? <button type="button" onClick={() => void deleteCatalogImage(media).then(load)}><Archive size={15} /> Удалить</button> : null}</figure>)}</div></section>
     </section>

@@ -1277,6 +1277,17 @@
   font-weight: 720;
 }
 
+.admin-manager__editor > header button.is-secondary {
+  border-color: #c9cac5;
+  background: #fff;
+  color: #292a27;
+}
+
+.admin-manager__editor > header button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
 .admin-manager__rows {
   display: grid;
 }
@@ -1419,6 +1430,28 @@
   line-height: 1.5;
 }
 
+.admin-optionalFields {
+  border: 1px solid var(--admin-line);
+  border-radius: 6px;
+  background: #fafaf8;
+}
+
+.admin-optionalFields summary {
+  padding: 13px 14px;
+  color: #454642;
+  cursor: pointer;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.admin-optionalFields__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 17px;
+  border-top: 1px solid var(--admin-line);
+  padding: 17px 14px;
+}
+
 .admin-checkField {
   display: flex;
   min-height: 44px;
@@ -1452,6 +1485,116 @@
   color: var(--admin-muted);
   font-size: 0.7rem;
   line-height: 1.5;
+}
+
+.admin-presentationSection {
+  background: #fafaf8;
+}
+
+.admin-presentationUpload {
+  display: flex;
+  min-height: 82px;
+  align-items: center;
+  gap: 12px;
+  margin-top: 18px;
+  border: 1px dashed #bfc1ba;
+  border-radius: 6px;
+  padding: 16px;
+  background: #fff;
+  color: #31332f;
+  cursor: pointer;
+}
+
+.admin-presentationUpload:hover {
+  border-color: #6e706a;
+  background: #f7f7f4;
+}
+
+.admin-presentationUpload:focus-visible,
+.admin-presentationFile__actions label:focus-visible {
+  outline: 2px solid #171717;
+  outline-offset: 2px;
+}
+
+.admin-presentationUpload.is-disabled,
+.admin-presentationFile__actions label.is-disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.admin-presentationUpload > span,
+.admin-presentationFile a > span {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.admin-presentationUpload strong,
+.admin-presentationFile strong {
+  overflow: hidden;
+  font-size: 0.74rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-presentationUpload small,
+.admin-presentationFile small {
+  color: var(--admin-muted);
+  font-size: 0.62rem;
+}
+
+.admin-presentationUpload input,
+.admin-presentationFile__actions input {
+  display: none;
+}
+
+.admin-presentationFile {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 18px;
+  border: 1px solid var(--admin-line);
+  border-radius: 6px;
+  padding: 12px;
+  background: #fff;
+}
+
+.admin-presentationFile > a {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+  color: #242522;
+  text-decoration: none;
+}
+
+.admin-presentationFile > a:hover strong {
+  text-decoration: underline;
+}
+
+.admin-presentationFile__actions {
+  display: flex;
+  gap: 7px;
+}
+
+.admin-presentationFile__actions label,
+.admin-presentationFile__actions button {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid #d0d1cc;
+  border-radius: 5px;
+  padding: 0 10px;
+  background: #fff;
+  color: #3a3b38;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.66rem;
+  font-weight: 680;
 }
 
 .admin-uploader {
@@ -1985,6 +2128,7 @@
   .admin-metrics,
   .admin-manager,
   .admin-editorGrid,
+  .admin-optionalFields__grid,
   .admin-mediaGrid,
   .admin-leadList dl {
     grid-template-columns: 1fr;
@@ -2000,6 +2144,17 @@
 
   .admin-manager__filters label.is-wide {
     grid-column: auto;
+  }
+
+  .admin-presentationFile {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-presentationFile__actions label,
+  .admin-presentationFile__actions button {
+    flex: 1;
+    justify-content: center;
   }
 
   .admin-manager__list {

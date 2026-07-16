@@ -28,6 +28,9 @@ export type CatalogItemRecord = {
   priceFrom: number | null;
   priceUnit: string | null;
   stockQuantity: number | null;
+  presentationPath: string | null;
+  presentationName: string | null;
+  presentationUrl: string | null;
   guestMin: number | null;
   guestMax: number | null;
   durationMin: number | null;
@@ -55,6 +58,8 @@ type CatalogItemRow = {
   price_from: number | string | null;
   price_unit: string | null;
   stock_quantity: number | null;
+  presentation_path: string | null;
+  presentation_name: string | null;
   guest_min: number | null;
   guest_max: number | null;
   duration_min: number | null;
@@ -83,6 +88,9 @@ function mapItem(row: CatalogItemRow): CatalogItemRecord {
     priceFrom: row.price_from === null ? null : Number(row.price_from),
     priceUnit: row.price_unit,
     stockQuantity: row.stock_quantity,
+    presentationPath: row.presentation_path,
+    presentationName: row.presentation_name,
+    presentationUrl: row.presentation_path ? getPublicMediaUrl(row.presentation_path) : null,
     guestMin: row.guest_min,
     guestMax: row.guest_max,
     durationMin: row.duration_min,
@@ -129,7 +137,7 @@ export async function listCatalogItems(): Promise<CatalogItemRecord[]> {
   return ((data ?? []) as CatalogItemRow[]).map(mapItem);
 }
 
-export type CatalogItemInput = Omit<CatalogItemRecord, "id" | "updatedAt" | "media">;
+export type CatalogItemInput = Omit<CatalogItemRecord, "id" | "updatedAt" | "media" | "presentationUrl">;
 
 function toPayload(input: CatalogItemInput, userId: string) {
   return {
@@ -143,6 +151,8 @@ function toPayload(input: CatalogItemInput, userId: string) {
     price_from: input.priceFrom,
     price_unit: input.priceUnit || null,
     stock_quantity: input.stockQuantity,
+    presentation_path: input.presentationPath,
+    presentation_name: input.presentationName,
     guest_min: input.guestMin,
     guest_max: input.guestMax,
     duration_min: input.durationMin,
@@ -216,4 +226,71 @@ export async function deleteCatalogImage(media: CatalogMediaRecord) {
   if (error) throw error;
   const { error: storageError } = await client.storage.from("site-media").remove([media.storagePath]);
   if (storageError) throw storageError;
+}
+
+export async function uploadCatalogPresentation(
+  itemId: string,
+  file: File,
+  userId: string,
+  previousPath?: string | null,
+): Promise<CatalogItemRecord> {
+  if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+    throw new Error("Можно загрузить только PDF-файл.");
+  }
+  if (file.size > 30 * 1024 * 1024) {
+    throw new Error("PDF должен быть не больше 30 МБ.");
+  }
+
+  const supabase = requireSupabase();
+  const { data: currentItem, error: currentItemError } = await supabase
+    .from("catalog_items")
+    .select("category_id, kind")
+    .eq("id", itemId)
+    .single();
+  if (currentItemError) throw currentItemError;
+  if (currentItem.category_id === "props" || currentItem.kind === "prop") {
+    throw new Error("Для реквизита презентации не используются.");
+  }
+
+  const storagePath = `catalog/${itemId}/presentations/${crypto.randomUUID()}.pdf`;
+  const { error: uploadError } = await supabase.storage
+    .from("site-media")
+    .upload(storagePath, file, { contentType: "application/pdf", upsert: false });
+  if (uploadError) throw uploadError;
+
+  const { data, error: updateError } = await supabase
+    .from("catalog_items")
+    .update({ presentation_path: storagePath, presentation_name: file.name, updated_by: userId })
+    .eq("id", itemId)
+    .select("*, catalog_media(id, storage_path, alt_text, sort_order)")
+    .single();
+  if (updateError) {
+    await supabase.storage.from("site-media").remove([storagePath]);
+    throw updateError;
+  }
+
+  if (previousPath && previousPath !== storagePath) {
+    const { error: removeError } = await supabase.storage.from("site-media").remove([previousPath]);
+    if (removeError) throw removeError;
+  }
+
+  return mapItem(data as CatalogItemRow);
+}
+
+export async function deleteCatalogPresentation(
+  itemId: string,
+  storagePath: string,
+  userId: string,
+): Promise<CatalogItemRecord> {
+  const supabase = requireSupabase();
+  const { data, error: updateError } = await supabase
+    .from("catalog_items")
+    .update({ presentation_path: null, presentation_name: null, updated_by: userId })
+    .eq("id", itemId)
+    .select("*, catalog_media(id, storage_path, alt_text, sort_order)")
+    .single();
+  if (updateError) throw updateError;
+  const { error: storageError } = await supabase.storage.from("site-media").remove([storagePath]);
+  if (storageError) throw storageError;
+  return mapItem(data as CatalogItemRow);
 }
