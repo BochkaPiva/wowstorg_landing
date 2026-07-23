@@ -27,6 +27,19 @@ type TurnstileResult = {
   "error-codes"?: string[];
 };
 
+type TurnstileVerification =
+  | { valid: true }
+  | {
+    valid: false;
+    reason:
+      | "action_mismatch"
+      | "configuration_error"
+      | "hostname_mismatch"
+      | "token_expired_or_reused"
+      | "token_rejected"
+      | "verification_unavailable";
+  };
+
 const jsonHeaders = { "Content-Type": "application/json; charset=utf-8" };
 const productionOrigins = ["https://wowstorg.ru", "https://www.wowstorg.ru"];
 
@@ -129,12 +142,11 @@ async function hashFingerprint(value: string): Promise<string> {
   return Array.from(new Uint8Array(signature), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-async function verifyTurnstile(token: string, ip: string, expectedHostname: string): Promise<boolean> {
+async function verifyTurnstile(token: string, expectedHostnames: Set<string>): Promise<TurnstileVerification> {
   const form = new FormData();
   form.set("secret", env("TURNSTILE_SECRET_KEY"));
   form.set("response", token);
   form.set("idempotency_key", crypto.randomUUID());
-  if (ip !== "unknown") form.set("remoteip", ip);
 
   const result = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
     method: "POST",
@@ -143,22 +155,43 @@ async function verifyTurnstile(token: string, ip: string, expectedHostname: stri
   });
   if (!result.ok) {
     console.warn("Turnstile request failed", { status: result.status });
-    return false;
+    return { valid: false, reason: "verification_unavailable" };
   }
 
   const verification = await result.json() as TurnstileResult;
-  const valid = verification.success
-    && verification.hostname === expectedHostname
-    && (!verification.action || verification.action === "lead-form");
-  if (!valid) {
+  const errorCodes = verification["error-codes"] ?? [];
+  if (!verification.success) {
+    const reason = errorCodes.some((code) => code === "invalid-input-secret" || code === "missing-input-secret")
+      ? "configuration_error"
+      : errorCodes.includes("timeout-or-duplicate")
+      ? "token_expired_or_reused"
+      : errorCodes.includes("internal-error")
+      ? "verification_unavailable"
+      : "token_rejected";
     console.warn("Turnstile verification rejected", {
       action: verification.action ?? null,
-      errorCodes: verification["error-codes"] ?? [],
-      expectedHostname,
+      errorCodes,
+      expectedHostnames: Array.from(expectedHostnames),
+      hostname: verification.hostname ?? null,
+      reason,
+    });
+    return { valid: false, reason };
+  }
+
+  if (!verification.hostname || !expectedHostnames.has(verification.hostname)) {
+    console.warn("Turnstile hostname mismatch", {
+      expectedHostnames: Array.from(expectedHostnames),
       hostname: verification.hostname ?? null,
     });
+    return { valid: false, reason: "hostname_mismatch" };
   }
-  return valid;
+
+  if (verification.action && verification.action !== "lead-form") {
+    console.warn("Turnstile action mismatch", { action: verification.action });
+    return { valid: false, reason: "action_mismatch" };
+  }
+
+  return { valid: true };
 }
 
 function parseDate(value: unknown, flexible: boolean): string | null {
@@ -204,9 +237,13 @@ Deno.serve(async (request) => {
     const requestedCatalogSelection = parseCatalogSelection(payload.catalogSelection, payload.catalogSelectionIds);
 
     const clientIp = getClientIp(request);
-    const hostname = new URL(origin).hostname;
-    if (!await verifyTurnstile(turnstileToken, clientIp, hostname)) {
-      return response(origin, 400, { error: "verification_failed" });
+    const allowedHostnames = new Set(Array.from(origins, (allowedOrigin) => new URL(allowedOrigin).hostname));
+    const verification = await verifyTurnstile(turnstileToken, allowedHostnames);
+    if (!verification.valid) {
+      const status = verification.reason === "configuration_error" || verification.reason === "verification_unavailable"
+        ? 503
+        : 400;
+      return response(origin, status, { error: "verification_failed", reason: verification.reason });
     }
 
     const ipHash = await hashFingerprint(clientIp);

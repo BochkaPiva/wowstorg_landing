@@ -229,9 +229,17 @@ export function LeadForm() {
       });
 
       if (!response.ok) {
-        const result = await response.json().catch(() => null) as { error?: string } | null;
+        const result = await response.json().catch(() => null) as { error?: string; reason?: string } | null;
         if (response.status === 429) throw new Error("Слишком много попыток. Подождите несколько минут и попробуйте снова.");
-        if (result?.error === "verification_failed") throw new Error("Проверка безопасности не прошла. Мы уже обновили её — отправьте ещё раз.");
+        if (result?.error === "verification_failed") {
+          if (result.reason === "configuration_error") {
+            throw new Error("Форма временно не может подтвердить проверку безопасности. Мы уже видим точную причину — свяжитесь с нами по телефону или почте выше.");
+          }
+          if (result.reason === "verification_unavailable") {
+            throw new Error("Сервис проверки безопасности временно не отвечает. Попробуйте отправить заявку через минуту.");
+          }
+          throw new Error("Проверка безопасности не прошла. Виджет обновлён — отправьте форму ещё раз.");
+        }
         throw new Error("Заявка не отправилась. Попробуйте ещё раз или свяжитесь с нами напрямую.");
       }
 
