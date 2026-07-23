@@ -133,6 +133,7 @@ async function verifyTurnstile(token: string, ip: string, expectedHostname: stri
   const form = new FormData();
   form.set("secret", env("TURNSTILE_SECRET_KEY"));
   form.set("response", token);
+  form.set("idempotency_key", crypto.randomUUID());
   if (ip !== "unknown") form.set("remoteip", ip);
 
   const result = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
@@ -140,12 +141,24 @@ async function verifyTurnstile(token: string, ip: string, expectedHostname: stri
     body: form,
     signal: AbortSignal.timeout(5000),
   });
-  if (!result.ok) return false;
+  if (!result.ok) {
+    console.warn("Turnstile request failed", { status: result.status });
+    return false;
+  }
 
   const verification = await result.json() as TurnstileResult;
-  return verification.success
+  const valid = verification.success
     && verification.hostname === expectedHostname
     && (!verification.action || verification.action === "lead-form");
+  if (!valid) {
+    console.warn("Turnstile verification rejected", {
+      action: verification.action ?? null,
+      errorCodes: verification["error-codes"] ?? [],
+      expectedHostname,
+      hostname: verification.hostname ?? null,
+    });
+  }
+  return valid;
 }
 
 function parseDate(value: unknown, flexible: boolean): string | null {

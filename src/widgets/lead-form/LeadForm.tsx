@@ -1,8 +1,8 @@
 import { ArrowLeft, ArrowRight, CalendarDays, Check, ChevronLeft, ChevronRight, ShoppingBag } from "lucide-react";
-import { type FormEvent, useCallback, useMemo, useState } from "react";
+import { type FormEvent, useCallback, useMemo, useRef, useState } from "react";
 import { useCatalogCart } from "@features/catalog-cart/CatalogCartContext";
 import { useSiteContent } from "@features/site-content/SiteContentContext";
-import { TurnstileWidget } from "@shared/ui/TurnstileWidget";
+import { TurnstileWidget, type TurnstileWidgetHandle } from "@shared/ui/TurnstileWidget";
 import { LegalLink } from "@widgets/legal/LegalModal";
 
 type LeadFormState = {
@@ -130,8 +130,8 @@ export function LeadForm() {
   });
   const [submissionStatus, setSubmissionStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [submissionMessage, setSubmissionMessage] = useState("");
-  const [turnstileToken, setTurnstileToken] = useState("");
-  const [challengeKey, setChallengeKey] = useState(0);
+  const turnstileRef = useRef<TurnstileWidgetHandle>(null);
+  const [turnstileReady, setTurnstileReady] = useState(false);
   const { items: cartItems, totalQuantity, clearCart } = useCatalogCart();
   const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY ?? "";
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, "") ?? "";
@@ -172,7 +172,6 @@ export function LeadForm() {
     setForm((current) => ({ ...current, [key]: value }));
   };
 
-  const handleTurnstileToken = useCallback((token: string) => setTurnstileToken(token), []);
   const handleTurnstileError = useCallback((code?: string) => {
     setSubmissionStatus("error");
     setSubmissionMessage(code === "110200"
@@ -188,9 +187,9 @@ export function LeadForm() {
       setSubmissionMessage("Форма ещё не подключена к серверу. Используйте телефон или почту слева.");
       return;
     }
-    if (!turnstileToken) {
+    if (!turnstileReady || !turnstileRef.current) {
       setSubmissionStatus("error");
-      setSubmissionMessage("Подождите секунду: завершается проверка безопасности.");
+      setSubmissionMessage("Проверка безопасности ещё загружается. Подождите секунду и отправьте снова.");
       return;
     }
 
@@ -204,6 +203,7 @@ export function LeadForm() {
     const message = [dateNote, form.message.trim()].filter(Boolean).join("\n");
 
     try {
+      const turnstileToken = await turnstileRef.current.execute();
       const response = await fetch(`${supabaseUrl}/functions/v1/submit-lead`, {
         method: "POST",
         headers: {
@@ -231,7 +231,7 @@ export function LeadForm() {
       if (!response.ok) {
         const result = await response.json().catch(() => null) as { error?: string } | null;
         if (response.status === 429) throw new Error("Слишком много попыток. Подождите несколько минут и попробуйте снова.");
-        if (result?.error === "verification_failed") throw new Error("Проверка безопасности устарела. Попробуйте отправить ещё раз.");
+        if (result?.error === "verification_failed") throw new Error("Проверка безопасности не прошла. Мы уже обновили её — отправьте ещё раз.");
         throw new Error("Заявка не отправилась. Попробуйте ещё раз или свяжитесь с нами напрямую.");
       }
 
@@ -243,8 +243,7 @@ export function LeadForm() {
       setSubmissionMessage(error instanceof Error && error.name !== "TimeoutError"
         ? error.message
         : "Сервер отвечает слишком долго. Попробуйте ещё раз или свяжитесь с нами напрямую.");
-      setTurnstileToken("");
-      setChallengeKey((current) => current + 1);
+      turnstileRef.current?.reset();
     }
   };
 
@@ -268,7 +267,7 @@ export function LeadForm() {
               <Check size={28} aria-hidden="true" />
               <strong>Спасибо, всё получили.</strong>
               <p>{submissionMessage}</p>
-              <button type="button" onClick={() => { setForm(initialState); setStep(1); setSubmissionStatus("idle"); setSubmissionMessage(""); setTurnstileToken(""); setChallengeKey((current) => current + 1); }}>Отправить ещё одну заявку</button>
+              <button type="button" onClick={() => { setForm(initialState); setStep(1); setSubmissionStatus("idle"); setSubmissionMessage(""); setTurnstileReady(false); }}>Отправить ещё одну заявку</button>
             </div>
           ) : <>
           <div className={cartItems.length ? "brief-cartSummary is-selected" : "brief-cartSummary is-empty"}>
@@ -405,11 +404,11 @@ export function LeadForm() {
                 <span>Даю <LegalLink document="personalData">согласие на обработку персональных данных</LegalLink> и принимаю <LegalLink document="privacy">политику конфиденциальности</LegalLink>.</span>
               </label>
 
-              {turnstileSiteKey ? <TurnstileWidget key={challengeKey} siteKey={turnstileSiteKey} onToken={handleTurnstileToken} onError={handleTurnstileError} /> : null}
+              {turnstileSiteKey ? <TurnstileWidget ref={turnstileRef} siteKey={turnstileSiteKey} onReady={setTurnstileReady} onError={handleTurnstileError} /> : null}
 
               <div className="brief-form__actions">
                 <button type="button" className="brief-form__back" onClick={() => setStep(1)}><ArrowLeft size={18} /> Назад</button>
-                <button className="brief-form__submit" type="submit" disabled={submissionStatus === "submitting" || Boolean(turnstileSiteKey && !turnstileToken)}>{submissionStatus === "submitting" ? "Отправляем…" : "Отправить"} <ArrowRight size={18} /></button>
+                <button className="brief-form__submit" type="submit" disabled={submissionStatus === "submitting" || Boolean(turnstileSiteKey && !turnstileReady)}>{submissionStatus === "submitting" ? "Проверяем и отправляем…" : "Отправить"} <ArrowRight size={18} /></button>
               </div>
               {submissionMessage ? <p className={`brief-form__delivery is-${submissionStatus}`} role="status">{submissionMessage}</p> : null}
             </div>

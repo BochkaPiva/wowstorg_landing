@@ -386,14 +386,23 @@ export function DinoStory() {
 
         <div className="dino-story__vignette" aria-hidden="true" />
 
-        {scenes.map((scene, index) => (
+        {nativeStoryProgress ? (
+          <StoryCopy
+            key={`mobile-${activeScene}-${scenes[activeScene].title}`}
+            scene={scenes[activeScene]}
+            index={activeScene}
+            progress={storyProgress}
+            active
+            staticPosition
+          />
+        ) : scenes.map((scene, index) => (
           <StoryCopy
             key={scene.title}
             scene={scene}
             index={index}
             progress={storyProgress}
             active={activeScene === index}
-            staticPosition={nativeStoryProgress}
+            staticPosition={false}
           />
         ))}
 

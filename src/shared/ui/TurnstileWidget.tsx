@@ -1,8 +1,10 @@
-import { useEffect, useRef } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 
 type TurnstileApi = {
-  render: (container: HTMLElement, options: Record<string, unknown>) => string;
+  execute: (widgetId: string) => void;
   remove: (widgetId: string) => void;
+  reset: (widgetId: string) => void;
+  render: (container: HTMLElement, options: Record<string, unknown>) => string;
 };
 
 declare global {
@@ -10,6 +12,11 @@ declare global {
     turnstile?: TurnstileApi;
   }
 }
+
+export type TurnstileWidgetHandle = {
+  execute: () => Promise<string>;
+  reset: () => void;
+};
 
 let loader: Promise<TurnstileApi> | null = null;
 
@@ -41,42 +48,95 @@ function loadTurnstile(): Promise<TurnstileApi> {
   return pending;
 }
 
-export function TurnstileWidget({ siteKey, onToken, onError }: {
+export const TurnstileWidget = forwardRef<TurnstileWidgetHandle, {
   siteKey: string;
-  onToken: (token: string) => void;
   onError: (code?: string) => void;
-}) {
+  onReady: (ready: boolean) => void;
+}>(function TurnstileWidget({ siteKey, onError, onReady }, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const widgetIdRef = useRef("");
+  const pendingRef = useRef<{
+    reject: (error: Error) => void;
+    resolve: (token: string) => void;
+    timeout: number;
+  } | null>(null);
+
+  const rejectPending = (message: string) => {
+    const pending = pendingRef.current;
+    if (!pending) return;
+    window.clearTimeout(pending.timeout);
+    pending.reject(new Error(message));
+    pendingRef.current = null;
+  };
+
+  useImperativeHandle(ref, () => ({
+    execute: () => new Promise<string>((resolve, reject) => {
+      const widgetId = widgetIdRef.current;
+      if (!widgetId || !window.turnstile) {
+        reject(new Error("Проверка безопасности ещё загружается. Подождите секунду и отправьте снова."));
+        return;
+      }
+
+      rejectPending("Проверка безопасности была перезапущена.");
+      window.turnstile.reset(widgetId);
+      const timeout = window.setTimeout(() => {
+        pendingRef.current = null;
+        reject(new Error("Проверка безопасности заняла слишком много времени. Попробуйте отправить ещё раз."));
+      }, 20_000);
+      pendingRef.current = { resolve, reject, timeout };
+      window.turnstile.execute(widgetId);
+    }),
+    reset: () => {
+      rejectPending("Проверка безопасности была сброшена.");
+      const widgetId = widgetIdRef.current;
+      if (widgetId && window.turnstile) window.turnstile.reset(widgetId);
+    },
+  }), []);
 
   useEffect(() => {
     let cancelled = false;
-    let widgetId = "";
+    onReady(false);
 
     void loadTurnstile()
       .then((turnstile) => {
         if (cancelled || !containerRef.current) return;
-        widgetId = turnstile.render(containerRef.current, {
+        widgetIdRef.current = turnstile.render(containerRef.current, {
           sitekey: siteKey,
           action: "lead-form",
           theme: "light",
           size: "flexible",
-          appearance: "interaction-only",
-          callback: (token: string) => onToken(token),
-          "expired-callback": () => onToken(""),
-          "timeout-callback": () => onToken(""),
+          appearance: "execute",
+          execution: "execute",
+          retry: "auto",
+          "refresh-expired": "auto",
+          "refresh-timeout": "auto",
+          callback: (token: string) => {
+            const pending = pendingRef.current;
+            if (!pending) return;
+            window.clearTimeout(pending.timeout);
+            pending.resolve(token);
+            pendingRef.current = null;
+          },
+          "expired-callback": () => rejectPending("Проверка безопасности устарела. Отправьте форму ещё раз."),
+          "timeout-callback": () => rejectPending("Проверка безопасности не завершилась. Отправьте форму ещё раз."),
           "error-callback": (code: string) => {
-            onToken("");
+            rejectPending("Не удалось пройти проверку безопасности. Попробуйте ещё раз.");
             onError(code);
           },
         });
+        onReady(true);
       })
       .catch(() => onError());
 
     return () => {
       cancelled = true;
+      onReady(false);
+      rejectPending("Проверка безопасности была закрыта.");
+      const widgetId = widgetIdRef.current;
       if (widgetId && window.turnstile) window.turnstile.remove(widgetId);
+      widgetIdRef.current = "";
     };
-  }, [onError, onToken, siteKey]);
+  }, [onError, onReady, siteKey]);
 
   return <div className="brief-turnstile" ref={containerRef} aria-label="Защита формы от автоматических отправок" />;
-}
+});
